@@ -21,7 +21,7 @@ import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  Gauge,
+  Home,
   Calendar,
   Zap,
   ChevronRight,
@@ -39,9 +39,10 @@ import {
 import { cn } from "@/lib/utils";
 import { CCTVActivationView } from "@/components/cctv/cctv-activation-view";
 import { EventView, EventSubmenuTab } from "@/components/event/event-view";
+import { MultimediaComproView } from "@/components/home/multimedia-compro-view";
 
 export default function DashboardShell7Page() {
-  const [activeTab, setActiveTab] = React.useState<"dashboard" | "event" | "aktivasi">("event");
+  const [activeTab, setActiveTab] = React.useState<"home" | "event" | "aktivasi" | "dashboard">("home");
   const [eventSubTab, setEventSubTab] = React.useState<EventSubmenuTab>("dashboard");
   const [isEventSubmenuOpen, setIsEventSubmenuOpen] = React.useState(true);
 
@@ -90,17 +91,17 @@ export default function DashboardShell7Page() {
             <SidebarMenu className="space-y-1">
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  isActive={activeTab === "dashboard"}
-                  tooltip="Dashboard"
-                  onClick={() => setActiveTab("dashboard")}
+                  isActive={activeTab === "home" || activeTab === "dashboard"}
+                  tooltip="Home"
+                  onClick={() => setActiveTab("home")}
                   className={
-                    activeTab === "dashboard"
+                    activeTab === "home" || activeTab === "dashboard"
                       ? "bg-zinc-100/90 text-zinc-900 font-medium hover:bg-zinc-100"
                       : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
                   }
                 >
-                  <Gauge className="size-4 text-zinc-800" />
-                  <span>Dashboard</span>
+                  <Home className="size-4 text-zinc-800" />
+                  <span>Home</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <Collapsible
@@ -298,14 +299,16 @@ export default function DashboardShell7Page() {
         <div data-slot="content-area-container" className="flex-1 w-full min-w-0 max-w-full overflow-x-hidden">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 min-w-0">
             {activeTab === "aktivasi" && <CCTVActivationView />}
-            {activeTab === "dashboard" && (
-              <div className="py-24 text-center text-zinc-400">
-                <Gauge className="size-10 mx-auto text-zinc-300 mb-3" />
-                <p className="text-base font-semibold text-zinc-700">Halaman Utama Dashboard</p>
-                <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
-                  Area ini telah dikosongkan sesuai permintaan Anda. Klik menu Aktivasi di sidebar untuk melihat pencatatan CCTV dan Digital Twin 3D.
-                </p>
-              </div>
+            {(activeTab === "home" || activeTab === "dashboard") && (
+              <MultimediaComproView
+                onNavigateToEvent={() => {
+                  setActiveTab("event");
+                  setEventSubTab("dashboard");
+                }}
+                onNavigateToAktivasi={() => {
+                  setActiveTab("aktivasi");
+                }}
+              />
             )}
             {activeTab === "event" && (
               <React.Suspense
