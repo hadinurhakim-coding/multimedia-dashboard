@@ -1,69 +1,212 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import * as React from "react";
+import Image from "next/image";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarGroup,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarInset,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Gauge,
+  Calendar,
+  Zap,
+  ChevronRight,
+  Search,
+  Share2,
+  Languages,
+  Activity,
+  Bell,
+} from "lucide-react";
+import { CCTVActivationView } from "@/components/cctv/cctv-activation-view";
+
+export default function DashboardShell7Page() {
+  const [activeTab, setActiveTab] = React.useState<"dashboard" | "event" | "aktivasi">("aktivasi");
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <SidebarProvider defaultOpen={true}>
+      {/* 1. Sidebar collapsible="icon" */}
+      <Sidebar
+        collapsible="icon"
+        className="border-r border-zinc-200/80 bg-[#FAFAFA] text-zinc-800"
+      >
+        {/* Workspace Switcher Header with PLN Logo */}
+        <SidebarHeader className="p-2">
+          <SidebarMenu>
+            <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+              <SidebarMenuButton
+                size="lg"
+                className="gap-3 hover:bg-zinc-100 text-zinc-900 rounded-xl transition-all group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
+              >
+                <div className="size-8 w-8 h-8 aspect-square rounded-[6px] overflow-hidden flex items-center justify-center shrink-0 shadow-xs bg-[#FFD100]">
+                  <Image
+                    src="/images/pln-logo.png"
+                    alt="Logo PLN Petir"
+                    width={32}
+                    height={32}
+                    className="size-8 w-8 h-8 aspect-square object-contain rounded-[6px]"
+                    priority
+                  />
+                </div>
+                <div className="flex flex-col items-start leading-tight truncate group-data-[collapsible=icon]:hidden">
+                  <span className="text-sm font-semibold text-zinc-900 tracking-tight truncate">
+                    PLN Icon Plus
+                  </span>
+                  <span className="text-xs text-zinc-500 font-normal truncate">
+                    Multimedia Studio
+                  </span>
+                </div>
+                <ChevronRight className="ml-auto size-4 text-zinc-400 group-data-[collapsible=icon]:hidden" />
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+
+        {/* Sidebar Navigation Content */}
+        <SidebarContent className="px-2 py-2">
+          <SidebarGroup className="p-0">
+            <SidebarMenu className="space-y-1">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === "dashboard"}
+                  tooltip="Dashboard"
+                  onClick={() => setActiveTab("dashboard")}
+                  className={
+                    activeTab === "dashboard"
+                      ? "bg-zinc-100/90 text-zinc-900 font-medium hover:bg-zinc-100"
+                      : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
+                  }
+                >
+                  <Gauge className="size-4 text-zinc-800" />
+                  <span>Dashboard</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === "event"}
+                  tooltip="Event"
+                  onClick={() => setActiveTab("event")}
+                  className={
+                    activeTab === "event"
+                      ? "bg-zinc-100/90 text-zinc-900 font-medium hover:bg-zinc-100"
+                      : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
+                  }
+                >
+                  <Calendar className="size-4 text-zinc-500" />
+                  <span>Event</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === "aktivasi"}
+                  tooltip="Aktivasi"
+                  onClick={() => setActiveTab("aktivasi")}
+                  className={
+                    activeTab === "aktivasi"
+                      ? "bg-zinc-100/90 text-zinc-900 font-medium hover:bg-zinc-100"
+                      : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
+                  }
+                >
+                  <Zap className="size-4 text-zinc-500" />
+                  <span>Aktivasi</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+        </SidebarContent>
+      </Sidebar>
+
+      {/* 2. Main Content Area with Header */}
+      <SidebarInset className="bg-white text-zinc-900 min-w-0 flex-1 overflow-x-hidden flex flex-col min-h-svh">
+        {/* Floating Top Header Bar */}
+        <header className="bg-white relative z-30 mx-auto mt-3 flex w-[calc(100%-2rem)] max-w-7xl items-center justify-between rounded-xl border border-zinc-200/80 px-4 sm:px-6 py-2 shadow-xs shrink-0">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <SidebarTrigger className="text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 p-1.5 rounded-lg [&_svg]:size-5" />
+            <div className="hidden sm:block h-4 w-px bg-zinc-200" />
+            <div className="w-full max-w-72 hidden sm:block">
+              <button
+                type="button"
+                className="text-zinc-400 w-full flex items-center bg-transparent px-1 py-1 text-sm font-normal cursor-pointer hover:text-zinc-600"
+              >
+                <Search className="size-4 mr-2 text-zinc-400" />
+                <span>Cari unit CCTV, SN, atau mitra...</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              <Share2 className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg"
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              <Languages className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg"
+            >
+              <Activity className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg relative"
+            >
+              <Bell className="size-4" />
+              <span className="bg-[#00A2E9] absolute top-1.5 right-1.5 size-1.5 rounded-full" />
+            </Button>
+            <Avatar className="size-8 cursor-pointer ml-1">
+              <AvatarImage src="https://api.dicebear.com/7.x/bottts/svg?seed=user7" />
+              <AvatarFallback className="bg-zinc-900 text-white font-bold text-xs">
+                JD
+              </AvatarFallback>
+            </Avatar>
+          </div>
+        </header>
+
+        {/* 3. Dedicated Content Area Wrapper (Div Khusus Konten Area) */}
+        <div data-slot="content-area-container" className="flex-1 w-full min-w-0 max-w-full overflow-x-hidden">
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 min-w-0">
+            {activeTab === "aktivasi" && <CCTVActivationView />}
+            {activeTab === "dashboard" && (
+              <div className="py-24 text-center text-zinc-400">
+                <Gauge className="size-10 mx-auto text-zinc-300 mb-3" />
+                <p className="text-base font-semibold text-zinc-700">Halaman Utama Dashboard</p>
+                <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
+                  Area ini telah dikosongkan sesuai permintaan Anda. Klik menu Aktivasi di sidebar untuk melihat pencatatan CCTV dan Digital Twin 3D.
+                </p>
+              </div>
+            )}
+            {activeTab === "event" && (
+              <div className="py-24 text-center text-zinc-400">
+                <Calendar className="size-10 mx-auto text-zinc-300 mb-3" />
+                <p className="text-base font-semibold text-zinc-700">Manajemen Event</p>
+                <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
+                  Belum ada agenda event yang terjadwal.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

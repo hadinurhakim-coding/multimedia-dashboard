@@ -1,0 +1,201 @@
+export type CCTVStatus = "active" | "warning" | "offline";
+
+export interface CCTVUnit {
+  id: string;
+  sn: string;
+  name: string;
+  model: string;
+  type: string;
+  purchaseDate: string;
+  activationDate: string;
+  warrantyUntil: string;
+  warrantyStatus: "Valid" | "Expiring Soon" | "Expired";
+  location: string;
+  buildingZone: string;
+  floor: string;
+  position3D: [number, number, number]; // [x, y, z] in Three.js world
+  target3D: [number, number, number];   // where the camera looks
+  fovAngle: number;                     // coverage cone angle
+  partnerCompany: string;
+  partnerPic: string;
+  partnerPhone: string;
+  partnerEmail: string;
+  status: CCTVStatus;
+  statusLabel: string;
+  ipAddress: string;
+  macAddress: string;
+  resolution: string;
+  rtspUrl: string;
+  notes: string;
+}
+
+export const DUMMY_CCTV_DATA: CCTVUnit[] = [
+  {
+    id: "cctv-01",
+    sn: "SN-PLN-CCTV-081",
+    name: "CCTV 01 — Trafo Utama 150kV",
+    model: "Hikvision DS-2CD2T87G2-L (8MP Bullet ColorVu)",
+    type: "Bullet Outdoor IP67",
+    purchaseDate: "2024-01-12",
+    activationDate: "2024-02-01",
+    warrantyUntil: "2027-01-31",
+    warrantyStatus: "Valid",
+    location: "GI Gandul — Switchyard Bay Trafo 1",
+    buildingZone: "Switchyard Bay A",
+    floor: "Outdoor Ground",
+    position3D: [-6, 2.8, -4],
+    target3D: [-3, 0.5, -1],
+    fovAngle: 45,
+    partnerCompany: "PT Telkom Infra Solusindo",
+    partnerPic: "Budi Prasetyo (Lead System Engineer)",
+    partnerPhone: "+62 812-9876-5432",
+    partnerEmail: "budi.prasetyo@telkominfra.co.id",
+    status: "active",
+    statusLabel: "Normal / Online",
+    ipAddress: "10.24.12.101",
+    macAddress: "4C:11:AE:3D:88:01",
+    resolution: "3840 x 2160 (4K UHD)",
+    rtspUrl: "rtsp://10.24.12.101:554/live/ch0",
+    notes: "Monitoring visual level isolator oli & suhu visual transformer 150kV.",
+  },
+  {
+    id: "cctv-02",
+    sn: "SN-PLN-CCTV-082",
+    name: "CCTV 02 — Ruang Kontrol SCADA",
+    model: "Dahua IPC-HDBW5442R-ASE (4MP AI WizMind Dome)",
+    type: "Dome Indoor AI Vandal-proof",
+    purchaseDate: "2024-03-15",
+    activationDate: "2024-03-28",
+    warrantyUntil: "2027-03-27",
+    warrantyStatus: "Valid",
+    location: "Gedung Utama — Ruang SCADA & Dispatcher",
+    buildingZone: "Control Room",
+    floor: "Lantai 2",
+    position3D: [3.5, 3.2, -3.5],
+    target3D: [0.5, 0.8, -1],
+    fovAngle: 60,
+    partnerCompany: "PT Mega Komunikasi Mandiri",
+    partnerPic: "Ahmad Fauzi (Project Manager)",
+    partnerPhone: "+62 813-8877-2211",
+    partnerEmail: "ahmad.fauzi@megakom.co.id",
+    status: "active",
+    statusLabel: "Normal / Online",
+    ipAddress: "10.24.12.102",
+    macAddress: "4C:11:AE:3D:88:02",
+    resolution: "2560 x 1440 (2K QHD)",
+    rtspUrl: "rtsp://10.24.12.102:554/live/ch0",
+    notes: "AI facial recognition aktif untuk otorisasi operator ruang kontrol PLN.",
+  },
+  {
+    id: "cctv-03",
+    sn: "SN-PLN-CCTV-083",
+    name: "CCTV 03 — Server Rack & UPS Room",
+    model: "Axis P3245-V (Network Dome Lightfinder)",
+    type: "Dome Indoor Low-light",
+    purchaseDate: "2024-05-02",
+    activationDate: "2024-05-14",
+    warrantyUntil: "2027-05-13",
+    warrantyStatus: "Valid",
+    location: "Gedung Utama — Ruang Server IT & Battery UPS",
+    buildingZone: "Server & Battery Room",
+    floor: "Lantai 1",
+    position3D: [5.5, 2.8, 2.5],
+    target3D: [2.5, 0.5, 1.5],
+    fovAngle: 55,
+    partnerCompany: "PT Schneider Electric Systems",
+    partnerPic: "Dewi Lestari (Field Support Specialist)",
+    partnerPhone: "+62 811-3344-5566",
+    partnerEmail: "dewi.lestari@se-partner.co.id",
+    status: "active",
+    statusLabel: "Normal / Online",
+    ipAddress: "10.24.12.103",
+    macAddress: "4C:11:AE:3D:88:03",
+    resolution: "1920 x 1080 (Full HD)",
+    rtspUrl: "rtsp://10.24.12.103:554/live/ch0",
+    notes: "Terintegrasi dengan sensor asap dan suhu ruangan server PLN Icon Plus.",
+  },
+  {
+    id: "cctv-04",
+    sn: "SN-PLN-CCTV-084",
+    name: "CCTV 04 — Gerbang Utama & Pos Keamanan",
+    model: "Hikvision iDS-2CD7A46G0/P-IZHS (ANPR / LPR)",
+    type: "License Plate Recognition Bullet",
+    purchaseDate: "2024-06-20",
+    activationDate: "2024-07-05",
+    warrantyUntil: "2027-07-04",
+    warrantyStatus: "Valid",
+    location: "Perimeter Luar — Akses Portal Masuk Gerbang",
+    buildingZone: "Main Entrance Portal",
+    floor: "Outdoor Ground",
+    position3D: [-7, 2.5, 6],
+    target3D: [-4, 0.2, 8.5],
+    fovAngle: 40,
+    partnerCompany: "PT Telkom Infra Solusindo",
+    partnerPic: "Rudi Hartono (Security Systems Lead)",
+    partnerPhone: "+62 818-4455-6677",
+    partnerEmail: "rudi.hartono@telkominfra.co.id",
+    status: "warning",
+    statusLabel: "Perlu Kalibrasi Lensa",
+    ipAddress: "10.24.12.104",
+    macAddress: "4C:11:AE:3D:88:04",
+    resolution: "2560 x 1440 (2K QHD)",
+    rtspUrl: "rtsp://10.24.12.104:554/live/ch0",
+    notes: "Terdapat degradasi fokus lensa kamera ANPR saat malam hari; tiket kalibrasi terbuka.",
+  },
+  {
+    id: "cctv-05",
+    sn: "SN-PLN-CCTV-085",
+    name: "CCTV 05 — Koridor Switchgear 20kV",
+    model: "Uniview IPC3234SR3-DVZ28 (4MP Starlight)",
+    type: "Dome Low-Light Indoor",
+    purchaseDate: "2024-08-10",
+    activationDate: "2024-08-22",
+    warrantyUntil: "2027-08-21",
+    warrantyStatus: "Valid",
+    location: "Gedung Switchgear — Koridor Cubicle 20kV",
+    buildingZone: "Switchgear Hall",
+    floor: "Lantai 1",
+    position3D: [-1.5, 3.0, 0.5],
+    target3D: [1.5, 0.5, 0.5],
+    fovAngle: 50,
+    partnerCompany: "PT Mega Komunikasi Mandiri",
+    partnerPic: "Ahmad Fauzi (Project Manager)",
+    partnerPhone: "+62 813-8877-2211",
+    partnerEmail: "ahmad.fauzi@megakom.co.id",
+    status: "active",
+    statusLabel: "Normal / Online",
+    ipAddress: "10.24.12.105",
+    macAddress: "4C:11:AE:3D:88:05",
+    resolution: "2560 x 1440 (2K QHD)",
+    rtspUrl: "rtsp://10.24.12.105:554/live/ch0",
+    notes: "Pengawasan rutin panel kubikel 20kV Gardu Hubung.",
+  },
+  {
+    id: "cctv-06",
+    sn: "SN-PLN-CCTV-086",
+    name: "CCTV 06 — Perimeter SUTT Pagar Utara",
+    model: "Hikvision DS-2TD2137-4/V1 (Thermal + Optical)",
+    type: "Dual-Spectrum Thermal Bullet",
+    purchaseDate: "2024-10-01",
+    activationDate: "2024-10-18",
+    warrantyUntil: "2027-10-17",
+    warrantyStatus: "Valid",
+    location: "Perimeter Luar — Pagar Utara Menara SUTT",
+    buildingZone: "North Boundary Fence",
+    floor: "Outdoor Ground",
+    position3D: [4.5, 3.5, -7.5],
+    target3D: [1, 0.2, -9],
+    fovAngle: 45,
+    partnerCompany: "PT Optima Solusi Integrasi",
+    partnerPic: "Hendrik Gunawan (Senior Network Engineer)",
+    partnerPhone: "+62 819-0123-4567",
+    partnerEmail: "hendrik@optimasolusi.co.id",
+    status: "offline",
+    statusLabel: "Offline (Link FO Terputus)",
+    ipAddress: "10.24.12.106",
+    macAddress: "4C:11:AE:3D:88:06",
+    resolution: "1920 x 1080 (Optical) + 384 x 288 (Thermal)",
+    rtspUrl: "rtsp://10.24.12.106:554/live/ch0",
+    notes: "Koneksi fiber optic drop core putus akibat pekerjaan galian eksternal. Perbaikan dijadwalkan.",
+  },
+];
