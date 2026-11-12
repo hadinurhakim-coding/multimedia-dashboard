@@ -5,7 +5,6 @@ import {
   Radio,
   Tv,
   Mic2,
-  Sparkles,
   Layers,
   CheckCircle2,
   Calendar,
@@ -188,39 +187,35 @@ export function MultimediaComproView({
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
       {/* 1. HERO BANNER: Corporate PLN Multimedia Showcase */}
-      <div className="relative overflow-hidden rounded-3xl border border-zinc-200/90 bg-gradient-to-br from-[#003B5C] via-[#00273D] to-[#001726] text-white p-6 sm:p-10 shadow-lg">
-        {/* Subtle Background Circuit Lines & Cyan Accent */}
-        <div className="absolute top-0 right-0 -mt-12 -mr-12 size-96 rounded-full bg-[#00A2E9]/15 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 -mb-16 size-80 rounded-full bg-[#FFD100]/10 blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 max-w-4xl space-y-5">
+      <div className="rounded-2xl border border-zinc-200/90 bg-white p-6 sm:p-8 shadow-xs space-y-6">
+        <div className="max-w-4xl space-y-4">
           {/* Top Identity Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-semibold text-[#FFD100]">
-            <Zap className="size-3.5 fill-[#FFD100] text-[#FFD100]" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-50 border border-sky-200 text-xs font-semibold text-[#003B5C]">
+            <Zap className="size-3.5 fill-[#FFD100] text-[#003B5C]" />
             <span>Divisi Multimedia & Broadcasting • PLN Icon Plus</span>
-            <span className="size-1 rounded-full bg-white/50" />
-            <span className="text-zinc-300 font-normal">Beyond KWh Excellence</span>
+            <span className="size-1 rounded-full bg-zinc-300" />
+            <span className="text-zinc-500 font-normal">Beyond KWh Excellence</span>
           </div>
 
           {/* Main Headline */}
-          <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-[1.15]">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#003B5C] tracking-tight leading-snug">
             Solusi Kreatif Multimedia, Produksi Video Sinematik & Penyiaran Korporat Berstandar Nasional
           </h1>
 
           {/* Body Prose */}
-          <p className="text-sm sm:text-base text-zinc-200 font-normal leading-relaxed max-w-3xl">
-            Pusat keunggulan kreatif terpadu dari <strong className="text-white font-semibold">PLN Icon Plus</strong> yang menyediakan layanan penyiaran siaran langsung (live broadcasting), studio produksi audio-visual, produksi konten animasi 3D, serta visualisasi digital twin spasial untuk mendukung agenda transformasi digital ketenagalistrikan nasional.
+          <p className="text-xs sm:text-sm text-zinc-600 font-normal leading-relaxed max-w-3xl">
+            Pusat keunggulan kreatif terpadu dari <strong className="text-zinc-900 font-semibold">PLN Icon Plus</strong> yang menyediakan layanan penyiaran siaran langsung (live broadcasting), studio produksi audio-visual, produksi konten animasi 3D, serta visualisasi digital twin spasial untuk mendukung agenda transformasi digital ketenagalistrikan nasional.
           </p>
 
           {/* CTA Buttons Row */}
-          <div className="flex flex-wrap items-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center gap-3 pt-1">
             <button
               type="button"
               onClick={() => {
                 const el = document.getElementById("layanan-multimedia-section");
                 el?.scrollIntoView({ behavior: "smooth" });
               }}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#00A2E9] hover:bg-[#008ecf] text-white text-xs sm:text-sm font-bold transition-all shadow-md cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#00A2E9] hover:bg-[#008ecf] text-white text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer"
             >
               <span>Jelajahi Layanan Multimedia</span>
               <ArrowRight className="size-4" />
@@ -230,9 +225,9 @@ export function MultimediaComproView({
               <button
                 type="button"
                 onClick={onNavigateToEvent}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs sm:text-sm font-semibold transition-all backdrop-blur-sm cursor-pointer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-50 hover:bg-zinc-100 text-[#003B5C] border border-zinc-200 text-xs sm:text-sm font-semibold transition-all cursor-pointer"
               >
-                <Calendar className="size-4 text-[#FFD100]" />
+                <Calendar className="size-4 text-[#00A2E9]" />
                 <span>Lihat Jadwal Shift & Event</span>
               </button>
             )}
@@ -241,7 +236,7 @@ export function MultimediaComproView({
               <button
                 type="button"
                 onClick={onNavigateToAktivasi}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs sm:text-sm font-semibold transition-all backdrop-blur-sm cursor-pointer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-50 hover:bg-zinc-100 text-[#003B5C] border border-zinc-200 text-xs sm:text-sm font-semibold transition-all cursor-pointer"
               >
                 <Layers className="size-4 text-[#00A2E9]" />
                 <span>Digital Twin CCTV 3D</span>
@@ -250,38 +245,38 @@ export function MultimediaComproView({
           </div>
         </div>
 
-        {/* 4 Bottom Key Statistics Badges */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-8 mt-8 border-t border-white/10 relative z-10">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-1.5 text-[#00A2E9]">
-              <Radio className="size-4" />
-              <span className="text-xl sm:text-2xl font-black text-white">500+</span>
+        {/* 4 Bottom Key Statistics Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-5 border-t border-zinc-100">
+          <div className="p-3.5 rounded-xl border border-zinc-200/70 bg-zinc-50/70 space-y-1">
+            <div className="flex items-center gap-2">
+              <Radio className="size-4 text-[#00A2E9]" />
+              <span className="text-xl sm:text-2xl font-black text-[#003B5C]">500+</span>
             </div>
-            <p className="text-[11px] text-zinc-300 font-medium">Live Broadcast RUPS & Townhall</p>
+            <p className="text-xs text-zinc-500 font-medium">Live Broadcast RUPS & Townhall</p>
           </div>
 
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-1.5 text-[#FFD100]">
-              <Tv className="size-4" />
-              <span className="text-xl sm:text-2xl font-black text-white">4K HDR</span>
+          <div className="p-3.5 rounded-xl border border-zinc-200/70 bg-zinc-50/70 space-y-1">
+            <div className="flex items-center gap-2">
+              <Tv className="size-4 text-[#00A2E9]" />
+              <span className="text-xl sm:text-2xl font-black text-[#003B5C]">4K HDR</span>
             </div>
-            <p className="text-[11px] text-zinc-300 font-medium">Multi-Camera Cinema Production</p>
+            <p className="text-xs text-zinc-500 font-medium">Multi-Camera Cinema Production</p>
           </div>
 
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-1.5 text-emerald-400">
-              <ShieldCheck className="size-4" />
-              <span className="text-xl sm:text-2xl font-black text-white">99.9%</span>
+          <div className="p-3.5 rounded-xl border border-zinc-200/70 bg-zinc-50/70 space-y-1">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-4 text-emerald-600" />
+              <span className="text-xl sm:text-2xl font-black text-[#003B5C]">99.9%</span>
             </div>
-            <p className="text-[11px] text-zinc-300 font-medium">Broadcasting SLA & Redundansi</p>
+            <p className="text-xs text-zinc-500 font-medium">Broadcasting SLA & Redundansi</p>
           </div>
 
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-1.5 text-[#00A2E9]">
-              <Users className="size-4" />
-              <span className="text-xl sm:text-2xl font-black text-white">Siaga 24/7</span>
+          <div className="p-3.5 rounded-xl border border-zinc-200/70 bg-zinc-50/70 space-y-1">
+            <div className="flex items-center gap-2">
+              <Users className="size-4 text-[#00A2E9]" />
+              <span className="text-xl sm:text-2xl font-black text-[#003B5C]">Siaga 24/7</span>
             </div>
-            <p className="text-[11px] text-zinc-300 font-medium">Tim Teknis VJ & Kameramen</p>
+            <p className="text-xs text-zinc-500 font-medium">Tim Teknis VJ & Kameramen</p>
           </div>
         </div>
       </div>
@@ -290,9 +285,8 @@ export function MultimediaComproView({
       <div id="layanan-multimedia-section" className="space-y-5 pt-2">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#00A2E9] uppercase tracking-wider mb-1">
-              <Sparkles className="size-3.5" />
-              <span>Kapabilitas & Portofolio Layanan</span>
+            <div className="text-xs font-bold text-[#00A2E9] uppercase tracking-wider mb-1">
+              Kapabilitas & Portofolio Layanan
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-[#003B5C] tracking-tight">
               Pilar Solusi Multimedia Terpadu
@@ -338,8 +332,8 @@ export function MultimediaComproView({
               >
                 <div className="space-y-3.5">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="size-11 rounded-xl bg-gradient-to-br from-[#003B5C] to-[#00A2E9] text-white flex items-center justify-center shadow-xs shrink-0">
-                      <IconComponent className="size-5" />
+                    <div className="size-10 rounded-xl bg-sky-50 text-[#003B5C] border border-sky-200 flex items-center justify-center shrink-0">
+                      <IconComponent className="size-5 text-[#003B5C]" />
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-sky-50 text-[#003B5C] border border-sky-200">
@@ -573,11 +567,10 @@ export function MultimediaComproView({
       </div>
 
       {/* 6. CONTACT & STUDIO RESERVATION CTA */}
-      <div className="rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 via-white to-sky-50/60 p-6 sm:p-8 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-6 sm:p-8 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-2 max-w-xl">
-          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#003B5C] uppercase tracking-wider">
-            <Radio className="size-3.5 text-[#00A2E9]" />
-            <span>Studio Multimedia PLN Icon Plus Siap Melayani</span>
+          <div className="text-xs font-bold text-[#003B5C] uppercase tracking-wider">
+            Studio Multimedia PLN Icon Plus Siap Melayani
           </div>
           <h3 className="text-xl font-black text-[#003B5C] tracking-tight">
             Membutuhkan Dukungan Siaran Langsung atau Produksi Video?
