@@ -2,23 +2,13 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { CCTVUnit, FacilityLocationId, FACILITY_LOCATIONS } from "@/types/cctv";
 import {
-  Compass,
-  Eye,
   Activity,
   AlertTriangle,
   WifiOff,
-  MousePointerClick,
-  Lock,
-  Unlock,
   ChevronDown,
   Check,
-  Crosshair,
-  Camera,
-  Keyboard,
-  X,
   RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,6 +19,272 @@ interface CCTV3DLocatorProps {
   onSelectCCTV: (id: string) => void;
   selectedLocationId?: FacilityLocationId;
   onSelectLocation?: (locationId: FacilityLocationId) => void;
+}
+
+// -----------------------------------------------------------------------------
+// 3D Plain Character (Karakter Polos) with Procedural Walking Gait
+// -----------------------------------------------------------------------------
+function createPlainCharacter(): {
+  group: THREE.Group;
+  updateAnimation: (isMoving: boolean, speedMultiplier: number, delta: number) => void;
+} {
+  const group = new THREE.Group();
+
+  // Materials: Plain, clean, sleek stylized matte mannequin
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: "#E2E8F0", // Slate 200 light clean neutral grey
+    roughness: 0.35,
+    metalness: 0.15,
+  });
+
+  const jointMat = new THREE.MeshStandardMaterial({
+    color: "#64748B", // Slate 500 for joints and waist
+    roughness: 0.55,
+    metalness: 0.2,
+  });
+
+  const visorMat = new THREE.MeshStandardMaterial({
+    color: "#00A2E9", // PLN Cyan visor accent
+    roughness: 0.15,
+    metalness: 0.6,
+    emissive: "#003B5C",
+    emissiveIntensity: 0.4,
+  });
+
+  // Pelvis / Hips
+  const pelvisGeo = new THREE.CylinderGeometry(0.18, 0.14, 0.16, 16);
+  const pelvis = new THREE.Mesh(pelvisGeo, jointMat);
+  pelvis.position.y = 0.94;
+  pelvis.castShadow = true;
+  pelvis.receiveShadow = true;
+  group.add(pelvis);
+
+  // Torso Group (Chest + Neck + Head + Arms)
+  const torsoGroup = new THREE.Group();
+  torsoGroup.position.y = 1.02;
+  group.add(torsoGroup);
+
+  // Chest
+  const chestGeo = new THREE.BoxGeometry(0.38, 0.42, 0.22);
+  const chest = new THREE.Mesh(chestGeo, bodyMat);
+  chest.position.y = 0.22;
+  chest.castShadow = true;
+  chest.receiveShadow = true;
+  torsoGroup.add(chest);
+
+  // Neck
+  const neckGeo = new THREE.CylinderGeometry(0.08, 0.09, 0.08, 12);
+  const neck = new THREE.Mesh(neckGeo, jointMat);
+  neck.position.y = 0.47;
+  torsoGroup.add(neck);
+
+  // Head Group
+  const headGroup = new THREE.Group();
+  headGroup.position.y = 0.62;
+  torsoGroup.add(headGroup);
+
+  const headGeo = new THREE.SphereGeometry(0.14, 20, 20);
+  headGeo.scale(1.0, 1.15, 1.05);
+  const head = new THREE.Mesh(headGeo, bodyMat);
+  head.castShadow = true;
+  headGroup.add(head);
+
+  // Stylized Sleek Visor
+  const visorGeo = new THREE.BoxGeometry(0.20, 0.07, 0.12);
+  const visor = new THREE.Mesh(visorGeo, visorMat);
+  visor.position.set(0, 0.02, 0.10);
+  headGroup.add(visor);
+
+  // Left Arm (Shoulder Pivot)
+  const leftArmPivot = new THREE.Group();
+  leftArmPivot.position.set(-0.25, 0.38, 0);
+  torsoGroup.add(leftArmPivot);
+
+  const shoulderGeo = new THREE.SphereGeometry(0.065, 12, 12);
+  const leftShoulder = new THREE.Mesh(shoulderGeo, jointMat);
+  leftArmPivot.add(leftShoulder);
+
+  const upperArmGeo = new THREE.CylinderGeometry(0.052, 0.046, 0.30, 12);
+  const leftUpperArm = new THREE.Mesh(upperArmGeo, bodyMat);
+  leftUpperArm.position.y = -0.17;
+  leftUpperArm.castShadow = true;
+  leftArmPivot.add(leftUpperArm);
+
+  const elbowGeo = new THREE.SphereGeometry(0.046, 12, 12);
+  const leftElbow = new THREE.Mesh(elbowGeo, jointMat);
+  leftElbow.position.y = -0.32;
+  leftArmPivot.add(leftElbow);
+
+  const forearmGeo = new THREE.CylinderGeometry(0.046, 0.040, 0.28, 12);
+  const leftForearm = new THREE.Mesh(forearmGeo, bodyMat);
+  leftForearm.position.y = -0.47;
+  leftForearm.castShadow = true;
+  leftArmPivot.add(leftForearm);
+
+  const handGeo = new THREE.BoxGeometry(0.06, 0.08, 0.04);
+  const leftHand = new THREE.Mesh(handGeo, jointMat);
+  leftHand.position.y = -0.63;
+  leftArmPivot.add(leftHand);
+
+  // Right Arm (Shoulder Pivot)
+  const rightArmPivot = new THREE.Group();
+  rightArmPivot.position.set(0.25, 0.38, 0);
+  torsoGroup.add(rightArmPivot);
+
+  const rightShoulder = new THREE.Mesh(shoulderGeo, jointMat);
+  rightArmPivot.add(rightShoulder);
+
+  const rightUpperArm = new THREE.Mesh(upperArmGeo, bodyMat);
+  rightUpperArm.position.y = -0.17;
+  rightUpperArm.castShadow = true;
+  rightArmPivot.add(rightUpperArm);
+
+  const rightElbow = new THREE.Mesh(elbowGeo, jointMat);
+  rightElbow.position.y = -0.32;
+  rightArmPivot.add(rightElbow);
+
+  const rightForearm = new THREE.Mesh(forearmGeo, bodyMat);
+  rightForearm.position.y = -0.47;
+  rightForearm.castShadow = true;
+  rightArmPivot.add(rightForearm);
+
+  const rightHand = new THREE.Mesh(handGeo, jointMat);
+  rightHand.position.y = -0.63;
+  rightArmPivot.add(rightHand);
+
+  // Left Leg (Hip Pivot)
+  const leftLegPivot = new THREE.Group();
+  leftLegPivot.position.set(-0.11, 0.90, 0);
+  group.add(leftLegPivot);
+
+  const hipJointGeo = new THREE.SphereGeometry(0.07, 12, 12);
+  const leftHipJoint = new THREE.Mesh(hipJointGeo, jointMat);
+  leftLegPivot.add(leftHipJoint);
+
+  const thighGeo = new THREE.CylinderGeometry(0.070, 0.058, 0.40, 12);
+  const leftThigh = new THREE.Mesh(thighGeo, bodyMat);
+  leftThigh.position.y = -0.22;
+  leftThigh.castShadow = true;
+  leftLegPivot.add(leftThigh);
+
+  const kneeGeo = new THREE.SphereGeometry(0.058, 12, 12);
+  const leftKnee = new THREE.Mesh(kneeGeo, jointMat);
+  leftKnee.position.y = -0.43;
+  leftLegPivot.add(leftKnee);
+
+  const calfGeo = new THREE.CylinderGeometry(0.058, 0.048, 0.40, 12);
+  const leftCalf = new THREE.Mesh(calfGeo, bodyMat);
+  leftCalf.position.y = -0.64;
+  leftCalf.castShadow = true;
+  leftLegPivot.add(leftCalf);
+
+  const footGeo = new THREE.BoxGeometry(0.10, 0.07, 0.20);
+  const leftFoot = new THREE.Mesh(footGeo, jointMat);
+  leftFoot.position.set(0, -0.86, 0.04);
+  leftFoot.castShadow = true;
+  leftLegPivot.add(leftFoot);
+
+  // Right Leg (Hip Pivot)
+  const rightLegPivot = new THREE.Group();
+  rightLegPivot.position.set(0.11, 0.90, 0);
+  group.add(rightLegPivot);
+
+  const rightHipJoint = new THREE.Mesh(hipJointGeo, jointMat);
+  rightLegPivot.add(rightHipJoint);
+
+  const rightThigh = new THREE.Mesh(thighGeo, bodyMat);
+  rightThigh.position.y = -0.22;
+  rightThigh.castShadow = true;
+  rightLegPivot.add(rightThigh);
+
+  const rightKnee = new THREE.Mesh(kneeGeo, jointMat);
+  rightKnee.position.y = -0.43;
+  rightLegPivot.add(rightKnee);
+
+  const rightCalf = new THREE.Mesh(calfGeo, bodyMat);
+  rightCalf.position.y = -0.64;
+  rightCalf.castShadow = true;
+  rightLegPivot.add(rightCalf);
+
+  const rightFoot = new THREE.Mesh(footGeo, jointMat);
+  rightFoot.position.set(0, -0.86, 0.04);
+  rightFoot.castShadow = true;
+  rightLegPivot.add(rightFoot);
+
+  // Soft Contact Shadow Disc on ground
+  const shadowGeo = new THREE.CircleGeometry(0.42, 24);
+  const shadowMat = new THREE.MeshBasicMaterial({
+    color: "#000000",
+    transparent: true,
+    opacity: 0.35,
+    depthWrite: false,
+  });
+  const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+  shadowMesh.rotation.x = -Math.PI / 2;
+  shadowMesh.position.y = 0.015;
+  group.add(shadowMesh);
+
+  let walkCycle = 0;
+
+  const updateAnimation = (
+    isMoving: boolean,
+    speedMultiplier: number,
+    delta: number
+  ) => {
+    if (isMoving) {
+      walkCycle += delta * 8.5 * speedMultiplier;
+      const legSwing = Math.sin(walkCycle) * 0.65;
+      const armSwing = Math.sin(walkCycle) * 0.55;
+
+      leftLegPivot.rotation.x = legSwing;
+      rightLegPivot.rotation.x = -legSwing;
+
+      leftArmPivot.rotation.x = -armSwing;
+      rightArmPivot.rotation.x = armSwing;
+
+      // Vertical bounce & subtle sway
+      torsoGroup.position.y = 1.02 + Math.abs(Math.sin(walkCycle * 2)) * 0.04;
+      torsoGroup.rotation.y = Math.sin(walkCycle) * 0.08;
+      headGroup.rotation.y = -Math.sin(walkCycle) * 0.05;
+    } else {
+      walkCycle += delta * 2.0;
+      // Smooth damp back to idle stance
+      leftLegPivot.rotation.x = THREE.MathUtils.lerp(
+        leftLegPivot.rotation.x,
+        0,
+        0.15
+      );
+      rightLegPivot.rotation.x = THREE.MathUtils.lerp(
+        rightLegPivot.rotation.x,
+        0,
+        0.15
+      );
+      leftArmPivot.rotation.x = THREE.MathUtils.lerp(
+        leftArmPivot.rotation.x,
+        0,
+        0.15
+      );
+      rightArmPivot.rotation.x = THREE.MathUtils.lerp(
+        rightArmPivot.rotation.x,
+        0,
+        0.15
+      );
+
+      torsoGroup.position.y = 1.02 + Math.sin(walkCycle) * 0.012;
+      torsoGroup.rotation.y = THREE.MathUtils.lerp(
+        torsoGroup.rotation.y,
+        0,
+        0.15
+      );
+      headGroup.rotation.y = THREE.MathUtils.lerp(
+        headGroup.rotation.y,
+        0,
+        0.15
+      );
+    }
+  };
+
+  return { group, updateAnimation };
 }
 
 export function CCTV3DLocator({
@@ -42,11 +298,27 @@ export function CCTV3DLocator({
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const markersGroupRef = useRef<THREE.Group | null>(null);
   const environmentGroupRef = useRef<THREE.Group | null>(null);
   const markerMeshesMap = useRef<Map<string, THREE.Object3D>>(new Map());
+
+  // 3D Character Controller State & Refs
+  const characterGroupRef = useRef<THREE.Group | null>(null);
+  const characterAnimRef = useRef<
+    | ((isMoving: boolean, speedMultiplier: number, delta: number) => void)
+    | null
+  >(null);
+  const characterPosRef = useRef<THREE.Vector3>(
+    new THREE.Vector3(0, 0, 7.5)
+  );
+  const yawRef = useRef<number>(0); // 0 = looking forward (-Z towards stage)
+  const pitchRef = useRef<number>(0.20); // slightly looking down at character
+  const camDistRef = useRef<number>(3.4); // third-person distance
+  const activeKeysRef = useRef<Set<string>>(new Set());
+  const isDraggingRef = useRef<boolean>(false);
+  const lastMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const nearbyCCTVRef = useRef<string | null>(null);
 
   // Location Dropdown State
   const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
@@ -54,6 +326,11 @@ export function CCTV3DLocator({
   const currentLocation =
     FACILITY_LOCATIONS.find((l) => l.id === selectedLocationId) ||
     FACILITY_LOCATIONS[0];
+
+  const [filterStatus, setFilterStatus] = useState<
+    "all" | "active" | "warning" | "offline"
+  >("all");
+  const [nearbyCCTV, setNearbyCCTV] = useState<CCTVUnit | null>(null);
 
   // Close location dropdown when clicking outside
   useEffect(() => {
@@ -69,56 +346,25 @@ export function CCTV3DLocator({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Interaction Lock State: map controls disabled until double-clicked
-  const [isActivated, setIsActivated] = useState(false);
-  const isActivatedRef = useRef(false);
-
-  // Camera POV mode and View Preset state
-  const [isPOVMode, setIsPOVMode] = useState(false);
-  const isPOVModeRef = useRef(false);
-
-  useEffect(() => {
-    isPOVModeRef.current = isPOVMode;
-  }, [isPOVMode]);
-
-  const [viewMode, setViewMode] = useState<"iso" | "front" | "side" | "top" | "pov" | "custom">("iso");
-  const [showBlenderHelp, setShowBlenderHelp] = useState(false);
-
-  // Camera animation target
-  const animTarget = useRef<{
-    camPos: THREE.Vector3;
-    targetPos: THREE.Vector3;
-    isAnimating: boolean;
-  }>({
-    camPos: new THREE.Vector3(12, 14, 18),
-    targetPos: new THREE.Vector3(0, 1, 0),
-    isAnimating: false,
-  });
-
-  const [autoRotate, setAutoRotate] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "warning" | "offline">("all");
-
-  // Initialize Three.js Scene
+  // Initialize Three.js Scene with 3D Character Controller
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
 
-    // 1. Scene & Setup
+    // 1. Scene & Atmosphere
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#FAFAFA");
     sceneRef.current = scene;
 
-    // Subtle fog for depth
     scene.fog = new THREE.FogExp2("#FAFAFA", 0.018);
 
-    // 2. Camera
+    // 2. Camera (Third-Person View)
     const camera = new THREE.PerspectiveCamera(
       45,
       container.clientWidth / container.clientHeight,
       0.1,
       1000
     );
-    camera.position.set(14, 16, 20);
     cameraRef.current = camera;
 
     // 3. Renderer
@@ -133,54 +379,14 @@ export function CCTV3DLocator({
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // 4. Orbit Controls with Blender Behavior
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.screenSpacePanning = true; // Essential: allows panning vertically in screen space like Blender!
-    controls.minDistance = 0.2;          // Allows extreme close-up inspection of cameras, brackets, downlights
-    controls.maxDistance = 150;
-    controls.maxPolarAngle = Math.PI - 0.02; // Full vertical freedom to look up under ceiling, soffits & trusses
-    controls.minPolarAngle = 0.01;           // Can look straight down from top
-    controls.zoomSpeed = 1.2;
-    controls.panSpeed = 1.2;
-    controls.rotateSpeed = 0.8;
-
-    // Blender mouse button mapping:
-    // Left: Rotate (Orbit) - Shift+Left: Pan
-    // Middle: Rotate (Orbit) - Shift+Middle: Pan (Pure Blender MMB!)
-    // Right: Pan (Quick right drag pan)
-    controls.mouseButtons = {
-      LEFT: THREE.MOUSE.ROTATE,
-      MIDDLE: THREE.MOUSE.ROTATE,
-      RIGHT: THREE.MOUSE.PAN,
-    };
-
-    // Auto cancel camera fly-to and smoothly exit POV on manual orbit drag
-    controls.addEventListener("start", () => {
-      animTarget.current.isAnimating = false;
-      if (isPOVModeRef.current) {
-        setIsPOVMode(false);
-        setViewMode("custom");
-        if (cameraRef.current) {
-          cameraRef.current.fov = 45;
-          cameraRef.current.updateProjectionMatrix();
-        }
-      }
-    });
-
-    controls.target.set(0, selectedLocationId === "auditorium-pln" ? 1.2 : 1, 0);
-    controls.enabled = isActivatedRef.current;
-    controlsRef.current = controls;
-
-    // Prevent browser context menu on right click so RMB Pan is seamless
+    // Prevent context menu on right-click
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
     };
     renderer.domElement.addEventListener("contextmenu", handleContextMenu);
 
-    // 5. Lighting
-    const ambientLight = new THREE.AmbientLight("#FFFFFF", 1.2);
+    // 4. Lighting
+    const ambientLight = new THREE.AmbientLight("#FFFFFF", 1.25);
     scene.add(ambientLight);
 
     const dirLight = new THREE.DirectionalLight("#FFFFFF", 1.8);
@@ -197,12 +403,11 @@ export function CCTV3DLocator({
     dirLight.shadow.bias = -0.0005;
     scene.add(dirLight);
 
-    // Secondary soft fill light
-    const fillLight = new THREE.DirectionalLight("#00A2E9", 0.35);
+    const fillLight = new THREE.DirectionalLight("#00A2E9", 0.4);
     fillLight.position.set(-15, 10, -10);
     scene.add(fillLight);
 
-    // 6. Build Architectural Facility Model
+    // 5. Build Architectural Facility Model
     const envGroup = new THREE.Group();
     scene.add(envGroup);
     environmentGroupRef.current = envGroup;
@@ -212,17 +417,32 @@ export function CCTV3DLocator({
       buildSubstationEnvironment(envGroup);
     }
 
-    // 7. Group for CCTV Markers
+    // 6. Group for CCTV Markers
     const markersGroup = new THREE.Group();
     scene.add(markersGroup);
     markersGroupRef.current = markersGroup;
+
+    // 7. 3D Plain Character Instance
+    const character = createPlainCharacter();
+    scene.add(character.group);
+    characterGroupRef.current = character.group;
+    characterAnimRef.current = character.updateAnimation;
+
+    // Initial character position
+    if (selectedLocationId === "auditorium-pln") {
+      characterPosRef.current.set(0, 0, 7.5);
+      yawRef.current = 0; // Look forward towards stage
+    } else {
+      characterPosRef.current.set(0, 0, 6.0);
+      yawRef.current = 0;
+    }
+    character.group.position.copy(characterPosRef.current);
 
     // 8. Raycasting for Clicking Markers
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
     const handleClick = (event: MouseEvent) => {
-      if (!isActivatedRef.current) return;
       const rect = renderer.domElement.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -243,7 +463,82 @@ export function CCTV3DLocator({
 
     renderer.domElement.addEventListener("click", handleClick);
 
-    // 9. Resize Observer
+    // 9. Mouse Look Events (Pointer Lock + Click & Drag)
+    const domEl = renderer.domElement;
+
+    const onMouseDown = (e: MouseEvent) => {
+      // Request pointer lock on canvas click for FPS/TPS look
+      if (document.pointerLockElement !== domEl) {
+        domEl.requestPointerLock?.();
+      }
+      isDraggingRef.current = true;
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      const isLocked = document.pointerLockElement === domEl;
+      if (isLocked) {
+        const sens = 0.0026;
+        yawRef.current -= e.movementX * sens;
+        pitchRef.current = Math.max(
+          -0.35,
+          Math.min(1.15, pitchRef.current + e.movementY * sens)
+        );
+      } else if (isDraggingRef.current) {
+        const sens = 0.0035;
+        const dx = e.clientX - lastMousePosRef.current.x;
+        const dy = e.clientY - lastMousePosRef.current.y;
+        lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+
+        yawRef.current -= dx * sens;
+        pitchRef.current = Math.max(
+          -0.35,
+          Math.min(1.15, pitchRef.current + dy * sens)
+        );
+      }
+    };
+
+    const onMouseUp = () => {
+      isDraggingRef.current = false;
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      camDistRef.current = Math.max(
+        1.2,
+        Math.min(7.5, camDistRef.current + e.deltaY * 0.003)
+      );
+    };
+
+    domEl.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    domEl.addEventListener("wheel", onWheel, { passive: false });
+
+    // 10. Keyboard Controls for Movement (WASD + Shift)
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (document.activeElement?.tagName || "").toUpperCase();
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      activeKeysRef.current.add(e.code);
+
+      // Quick reset position with Key R
+      if (e.code === "KeyR") {
+        e.preventDefault();
+        characterPosRef.current.set(0, 0, 7.5);
+        yawRef.current = 0;
+        pitchRef.current = 0.20;
+      }
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      activeKeysRef.current.delete(e.code);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+
+    // 11. Resize Observer
     const resizeObserver = new ResizeObserver(() => {
       if (!container || !renderer || !camera) return;
       const width = container.clientWidth;
@@ -254,26 +549,108 @@ export function CCTV3DLocator({
     });
     resizeObserver.observe(container);
 
-    // 10. Animation Loop
+    // 12. Animation Loop with Character Movement & Third-Person Camera Follow
+    const clock = new THREE.Clock();
     let animationFrameId: number;
+    let lastProximityCheck = 0;
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
+      const delta = Math.min(clock.getDelta(), 0.1);
 
-      // Smooth camera fly-to interpolation
-      if (animTarget.current.isAnimating) {
-        camera.position.lerp(animTarget.current.camPos, 0.05);
-        controls.target.lerp(animTarget.current.targetPos, 0.05);
+      const charPos = characterPosRef.current;
+      const keys = activeKeysRef.current;
+      const yaw = yawRef.current;
+      const isShift = keys.has("ShiftLeft") || keys.has("ShiftRight");
 
-        if (
-          camera.position.distanceTo(animTarget.current.camPos) < 0.05 &&
-          controls.target.distanceTo(animTarget.current.targetPos) < 0.05
-        ) {
-          animTarget.current.isAnimating = false;
+      // Compute horizontal forward & right vectors based on camera yaw
+      const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+      const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+
+      const moveDir = new THREE.Vector3(0, 0, 0);
+      if (keys.has("KeyW") || keys.has("ArrowUp")) moveDir.add(forward);
+      if (keys.has("KeyS") || keys.has("ArrowDown")) moveDir.sub(forward);
+      if (keys.has("KeyD") || keys.has("ArrowRight")) moveDir.add(right);
+      if (keys.has("KeyA") || keys.has("ArrowLeft")) moveDir.sub(right);
+
+      const isMoving = moveDir.lengthSq() > 0.001;
+
+      if (isMoving) {
+        moveDir.normalize();
+        const speed = isShift ? 6.2 : 3.2; // m/s
+        charPos.x += moveDir.x * speed * delta;
+        charPos.z += moveDir.z * speed * delta;
+
+        // Smooth character body rotation towards movement direction
+        if (characterGroupRef.current) {
+          const targetAngle = Math.atan2(moveDir.x, moveDir.z);
+          let diff = targetAngle - characterGroupRef.current.rotation.y;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          characterGroupRef.current.rotation.y += diff * 0.25;
+        }
+
+        characterAnimRef.current?.(true, isShift ? 1.6 : 1.0, delta);
+      } else {
+        characterAnimRef.current?.(false, 1.0, delta);
+      }
+
+      // Room boundary clamping (Auditorium walls)
+      if (selectedLocationId === "auditorium-pln") {
+        charPos.x = Math.max(-11.2, Math.min(11.2, charPos.x));
+        charPos.z = Math.max(-9.5, Math.min(13.5, charPos.z));
+
+        // Smooth stage elevation
+        const onStage = charPos.z < -3.2 && Math.abs(charPos.x) < 6.5;
+        const targetGroundY = onStage ? 0.675 : 0.0;
+        charPos.y = THREE.MathUtils.lerp(charPos.y, targetGroundY, 0.2);
+      } else {
+        charPos.x = Math.max(-15, Math.min(15, charPos.x));
+        charPos.z = Math.max(-15, Math.min(15, charPos.z));
+        charPos.y = 0;
+      }
+
+      // Update character mesh position
+      if (characterGroupRef.current) {
+        characterGroupRef.current.position.copy(charPos);
+      }
+
+      // Third-Person Camera Positioning
+      const pitch = pitchRef.current;
+      const camDist = camDistRef.current;
+      const lookTarget = new THREE.Vector3(charPos.x, charPos.y + 1.45, charPos.z);
+
+      const horizDist = camDist * Math.cos(pitch);
+      const vertDist = camDist * Math.sin(pitch);
+      const idealCamPos = new THREE.Vector3(
+        charPos.x + Math.sin(yaw) * horizDist,
+        charPos.y + 1.45 + vertDist,
+        charPos.z + Math.cos(yaw) * horizDist
+      );
+
+      camera.position.lerp(idealCamPos, 0.22);
+      camera.lookAt(lookTarget);
+
+      // Periodic proximity check to CCTV cameras (every ~250ms)
+      const now = performance.now();
+      if (now - lastProximityCheck > 250) {
+        lastProximityCheck = now;
+        let closest: CCTVUnit | null = null;
+        let minDist = 4.5;
+        for (const c of cctvList) {
+          const [cx, cy, cz] = c.position3D;
+          const dist = charPos.distanceTo(new THREE.Vector3(cx, cy, cz));
+          if (dist < minDist) {
+            minDist = dist;
+            closest = c;
+          }
+        }
+        if (closest?.id !== nearbyCCTVRef.current) {
+          nearbyCCTVRef.current = closest ? closest.id : null;
+          setNearbyCCTV(closest);
         }
       }
 
-      controls.update();
       renderer.render(scene, camera);
     };
 
@@ -285,20 +662,24 @@ export function CCTV3DLocator({
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener("click", handleClick);
       renderer.domElement.removeEventListener("contextmenu", handleContextMenu);
-      controls.dispose();
+      domEl.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      domEl.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
     };
-  }, [onSelectCCTV, selectedLocationId]);
+  }, [onSelectCCTV, selectedLocationId, cctvList]);
 
   // Dynamic Rebuilding of 3D Facility Environment on Location Change
   useEffect(() => {
     const envGroup = environmentGroupRef.current;
     if (!envGroup) return;
 
-    // Dispose and clear previous environment objects
     while (envGroup.children.length > 0) {
       const child = envGroup.children[0];
       envGroup.remove(child);
@@ -309,20 +690,12 @@ export function CCTV3DLocator({
 
     if (selectedLocationId === "auditorium-pln") {
       buildAuditoriumEnvironment(envGroup);
-      if (controlsRef.current) {
-        controlsRef.current.target.set(0, 1.2, 0);
-      }
-      if (cameraRef.current) {
-        cameraRef.current.position.set(10, 12, 14);
-      }
+      characterPosRef.current.set(0, 0, 7.5);
+      yawRef.current = 0;
     } else {
       buildSubstationEnvironment(envGroup);
-      if (controlsRef.current) {
-        controlsRef.current.target.set(0, 1, 0);
-      }
-      if (cameraRef.current) {
-        cameraRef.current.position.set(14, 16, 20);
-      }
+      characterPosRef.current.set(0, 0, 6.0);
+      yawRef.current = 0;
     }
   }, [selectedLocationId]);
 
@@ -331,14 +704,12 @@ export function CCTV3DLocator({
     const markersGroup = markersGroupRef.current;
     if (!markersGroup) return;
 
-    // Clear old markers
     while (markersGroup.children.length > 0) {
       const child = markersGroup.children[0];
       markersGroup.remove(child);
     }
     markerMeshesMap.current.clear();
 
-    // Create markers for filtered CCTV
     const filteredList = cctvList.filter((item) => {
       if (filterStatus === "all") return true;
       return item.status === filterStatus;
@@ -353,346 +724,69 @@ export function CCTV3DLocator({
     });
   }, [cctvList, selectedCCTVId, filterStatus]);
 
-  // Handle fly-to when selectedCCTVId changes
+  // Character repositions near camera when selected in table
   useEffect(() => {
-    if (!selectedCCTVId || !cameraRef.current || !controlsRef.current) return;
-
-    const selectedUnit = cctvList.find((c) => c.id === selectedCCTVId);
-    if (!selectedUnit) return;
-
-    const [x, y, z] = selectedUnit.position3D;
-
-    if (isPOVModeRef.current) {
-      // In POV mode, animate camera directly to CCTV position looking at target
-      const [tx, ty, tz] = selectedUnit.target3D;
-      animTarget.current = {
-        camPos: new THREE.Vector3(x, y, z),
-        targetPos: new THREE.Vector3(tx, ty, tz),
-        isAnimating: true,
-      };
-      cameraRef.current.fov = selectedUnit.fovAngle || 50;
-      cameraRef.current.updateProjectionMatrix();
-    } else {
-      const targetPos = new THREE.Vector3(x, y, z);
-      // Frame camera ~2.5m away facing the unit for close inspection
-      const camOffset = new THREE.Vector3(
-        x >= 0 ? -2.2 : 2.2,
-        -0.3,
-        z < -5 ? 2.8 : -2.8
-      );
-      const camPos = targetPos.clone().add(camOffset);
-
-      animTarget.current = {
-        camPos,
-        targetPos,
-        isAnimating: true,
-      };
-    }
-  }, [selectedCCTVId, cctvList]);
-
-  // Controls Handlers with Blender-like View Presets
-  const handleResetCamera = useCallback(() => {
-    setIsPOVMode(false);
-    if (cameraRef.current) {
-      cameraRef.current.fov = 45;
-      cameraRef.current.updateProjectionMatrix();
-    }
-    setViewMode("iso");
-    if (selectedLocationId === "auditorium-pln") {
-      animTarget.current = {
-        camPos: new THREE.Vector3(12, 14, 18),
-        targetPos: new THREE.Vector3(0, 1.2, 0),
-        isAnimating: true,
-      };
-    } else {
-      animTarget.current = {
-        camPos: new THREE.Vector3(14, 16, 20),
-        targetPos: new THREE.Vector3(0, 1, 0),
-        isAnimating: true,
-      };
-    }
-  }, [selectedLocationId]);
-
-  const handleViewFront = useCallback(() => {
-    setIsPOVMode(false);
-    if (cameraRef.current) {
-      cameraRef.current.fov = 45;
-      cameraRef.current.updateProjectionMatrix();
-    }
-    setViewMode("front");
-    if (selectedLocationId === "auditorium-pln") {
-      // Direct front view of the stage & videotron from audience center
-      animTarget.current = {
-        camPos: new THREE.Vector3(0, 3.8, 14.5),
-        targetPos: new THREE.Vector3(0, 3.2, -8.0),
-        isAnimating: true,
-      };
-    } else {
-      animTarget.current = {
-        camPos: new THREE.Vector3(0, 7.0, 18.0),
-        targetPos: new THREE.Vector3(0, 1.5, 0),
-        isAnimating: true,
-      };
-    }
-  }, [selectedLocationId]);
-
-  const handleViewSide = useCallback(() => {
-    setIsPOVMode(false);
-    if (cameraRef.current) {
-      cameraRef.current.fov = 45;
-      cameraRef.current.updateProjectionMatrix();
-    }
-    setViewMode("side");
-    if (selectedLocationId === "auditorium-pln") {
-      // Right side elevation looking across hall & balconies
-      animTarget.current = {
-        camPos: new THREE.Vector3(16.5, 4.2, -2.0),
-        targetPos: new THREE.Vector3(0, 3.0, -2.0),
-        isAnimating: true,
-      };
-    } else {
-      animTarget.current = {
-        camPos: new THREE.Vector3(18.0, 6.0, 0),
-        targetPos: new THREE.Vector3(0, 1.5, 0),
-        isAnimating: true,
-      };
-    }
-  }, [selectedLocationId]);
-
-  const handleViewTop = useCallback(() => {
-    setIsPOVMode(false);
-    if (cameraRef.current) {
-      cameraRef.current.fov = 45;
-      cameraRef.current.updateProjectionMatrix();
-    }
-    setViewMode("top");
-    animTarget.current = {
-      camPos: new THREE.Vector3(0, 26, 0.001),
-      targetPos: new THREE.Vector3(0, 0, 0),
-      isAnimating: true,
-    };
-  }, []);
-
-  const handleFocusSelected = useCallback(() => {
-    setIsPOVMode(false);
-    if (cameraRef.current) {
-      cameraRef.current.fov = 45;
-      cameraRef.current.updateProjectionMatrix();
-    }
-    setViewMode("custom");
-
+    if (!selectedCCTVId) return;
     const unit = cctvList.find((c) => c.id === selectedCCTVId);
-    if (unit) {
-      const [x, y, z] = unit.position3D;
-      const targetPos = new THREE.Vector3(x, y, z);
-      // Frame camera ~2.5m away facing the unit for close inspection
-      const offset = new THREE.Vector3(
-        x >= 0 ? -2.2 : 2.2,
-        -0.3,
-        z < -5 ? 2.8 : -2.8
-      );
-      const camPos = targetPos.clone().add(offset);
-      animTarget.current = {
-        camPos,
-        targetPos,
-        isAnimating: true,
-      };
-    } else {
-      animTarget.current = {
-        camPos: new THREE.Vector3(10, 12, 14),
-        targetPos: new THREE.Vector3(0, 2.0, 0),
-        isAnimating: true,
-      };
-    }
+    if (!unit) return;
+
+    const [cx, , cz] = unit.position3D;
+    const standZ = cz < -4 ? -3.5 : Math.min(12, cz + 2.5);
+    const standX = Math.max(-10, Math.min(10, cx * 0.75));
+    characterPosRef.current.set(standX, cz < -4 ? 0.675 : 0, standZ);
+
+    yawRef.current = Math.atan2(standX - cx, standZ - cz);
+    pitchRef.current = 0.25;
   }, [selectedCCTVId, cctvList]);
 
-  const handleTogglePOV = useCallback(() => {
-    if (isPOVMode) {
-      // Exit POV mode
-      setIsPOVMode(false);
-      setViewMode("iso");
-      if (cameraRef.current) {
-        cameraRef.current.fov = 45;
-        cameraRef.current.updateProjectionMatrix();
-      }
-      handleFocusSelected();
-    } else {
-      // Enter POV mode
-      let unit = cctvList.find((c) => c.id === selectedCCTVId);
-      if (!unit && cctvList.length > 0) {
-        unit = cctvList[0];
-        onSelectCCTV(unit.id);
-      }
-      if (unit && cameraRef.current && controlsRef.current) {
-        setIsPOVMode(true);
-        setViewMode("pov");
-        const [x, y, z] = unit.position3D;
-        const [tx, ty, tz] = unit.target3D;
-        animTarget.current = {
-          camPos: new THREE.Vector3(x, y, z),
-          targetPos: new THREE.Vector3(tx, ty, tz),
-          isAnimating: true,
-        };
-        cameraRef.current.fov = unit.fovAngle || 50;
-        cameraRef.current.updateProjectionMatrix();
-      }
-    }
-  }, [isPOVMode, selectedCCTVId, cctvList, onSelectCCTV, handleFocusSelected]);
-
-  useEffect(() => {
-    if (controlsRef.current) {
-      controlsRef.current.autoRotate = autoRotate;
-      controlsRef.current.autoRotateSpeed = 0.8;
-    }
-  }, [autoRotate]);
-
-  // Synchronize isActivated state with OrbitControls and ref
-  useEffect(() => {
-    isActivatedRef.current = isActivated;
-    if (controlsRef.current) {
-      controlsRef.current.enabled = isActivated;
-    }
-  }, [isActivated]);
-
-  // Click outside to lock map
-  useEffect(() => {
-    if (!isActivated) return;
-
-    const handlePointerDownOutside = (event: PointerEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setIsActivated(false);
-      }
-    };
-
-    window.addEventListener("pointerdown", handlePointerDownOutside);
-    return () => window.removeEventListener("pointerdown", handlePointerDownOutside);
-  }, [isActivated]);
-
-  // Keyboard listener for Blender shortcuts & Nudge Pan
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Don't intercept when user is typing in forms/inputs
-      const activeTag = (document.activeElement?.tagName || "").toUpperCase();
-      if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT") {
-        return;
-      }
-
-      if (!isActivatedRef.current) return;
-
-      const code = event.code;
-      const key = event.key.toLowerCase();
-
-      // Blender Numpad & number keys:
-      if (code === "Numpad1" || key === "1") {
-        event.preventDefault();
-        handleViewFront();
-      } else if (code === "Numpad3" || key === "3") {
-        event.preventDefault();
-        handleViewSide();
-      } else if (code === "Numpad7" || key === "7") {
-        event.preventDefault();
-        handleViewTop();
-      } else if (code === "Numpad0" || key === "0") {
-        event.preventDefault();
-        handleTogglePOV();
-      } else if (code === "NumpadDecimal" || key === "." || key === "f") {
-        event.preventDefault();
-        handleFocusSelected();
-      } else if (code === "Numpad5" || key === "5" || key === "home") {
-        event.preventDefault();
-        handleResetCamera();
-      } else if (event.key === "Escape") {
-        if (isPOVModeRef.current) {
-          event.preventDefault();
-          handleTogglePOV();
-        } else {
-          setIsActivated(false);
-        }
-      } else if (
-        ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyA", "KeyD", "KeyW", "KeyS"].includes(code)
-      ) {
-        // Nudge pan with WASD or Arrow Keys (Blender walk/nudge navigation)
-        if (controlsRef.current && cameraRef.current) {
-          event.preventDefault();
-          animTarget.current.isAnimating = false;
-          const panStep = event.shiftKey ? 1.0 : 0.35;
-          const forward = new THREE.Vector3();
-          cameraRef.current.getWorldDirection(forward);
-          forward.y = 0;
-          forward.normalize();
-          const right = new THREE.Vector3()
-            .crossVectors(cameraRef.current.up, forward)
-            .normalize()
-            .negate();
-
-          const move = new THREE.Vector3();
-          if (code === "ArrowLeft" || code === "KeyA") move.addScaledVector(right, -panStep);
-          if (code === "ArrowRight" || code === "KeyD") move.addScaledVector(right, panStep);
-          if (code === "ArrowUp" || code === "KeyW") move.addScaledVector(forward, panStep);
-          if (code === "ArrowDown" || code === "KeyS") move.addScaledVector(forward, -panStep);
-
-          cameraRef.current.position.add(move);
-          controlsRef.current.target.add(move);
-          controlsRef.current.update();
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    handleViewFront,
-    handleViewSide,
-    handleViewTop,
-    handleTogglePOV,
-    handleFocusSelected,
-    handleResetCamera,
-  ]);
+  const handleResetCharacter = useCallback(() => {
+    characterPosRef.current.set(0, 0, 7.5);
+    yawRef.current = 0;
+    pitchRef.current = 0.20;
+    camDistRef.current = 3.4;
+  }, []);
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full max-w-full min-w-0 h-[400px] lg:h-[460px] rounded-xl border border-zinc-200/80 bg-white overflow-hidden shadow-xs flex flex-col"
+      className="relative w-full h-[620px] bg-zinc-950 rounded-xl overflow-hidden border border-zinc-200 select-none shadow-sm focus:outline-none"
+      tabIndex={0}
     >
-      {/* 3D Top Floating Toolbar */}
-      <div className="absolute top-3 inset-x-3 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        {/* Left: Facility Badge & Status Filter */}
-        <div
-          className={cn(
-            "relative flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-200/80 shadow-xs pointer-events-auto transition-all",
-            isLocationMenuOpen ? "z-50" : "z-20"
-          )}
-        >
-          {/* Location Dropdown Trigger & Options Popover */}
-          <div className="relative pr-3 border-r border-zinc-200 z-50" ref={locationMenuRef}>
+      {/* Three.js Canvas Container */}
+      <div
+        ref={mountRef}
+        className="w-full h-full cursor-grab active:cursor-grabbing"
+      />
+
+      {/* Top Floating Bar */}
+      <div className="absolute top-3 inset-x-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        {/* Left: Facility Location Selector & Status Filters */}
+        <div className="relative z-20 flex flex-wrap items-center gap-2 pointer-events-auto">
+          {/* Facility Location Selector */}
+          <div className="relative" ref={locationMenuRef}>
             <button
               type="button"
               onClick={() => setIsLocationMenuOpen(!isLocationMenuOpen)}
-              className="flex items-center gap-2 px-2 py-1 -my-0.5 rounded-md hover:bg-zinc-100 transition-colors cursor-pointer select-none group/loc"
-              title="Ganti Lokasi Fasilitas Digital Twin"
+              className="flex items-center gap-2 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-200/80 shadow-xs text-xs font-semibold text-zinc-900 hover:bg-zinc-50 transition-colors cursor-pointer"
             >
-              <span className="text-xs font-semibold text-zinc-900 tracking-tight">
-                {currentLocation.name}
-              </span>
+              <span>{currentLocation.name}</span>
               <ChevronDown
                 className={cn(
-                  "size-3.5 text-zinc-400 group-hover/loc:text-zinc-700 transition-transform duration-200",
+                  "size-3.5 text-zinc-400 transition-transform duration-200",
                   isLocationMenuOpen && "rotate-180"
                 )}
               />
             </button>
 
-            {/* Dropdown Options Popover matching the user's video UX */}
             {isLocationMenuOpen && (
-              <div className="absolute top-full left-0 mt-2 z-50 w-64 rounded-xl border border-zinc-200 bg-white p-1.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                  Pilih Lokasi Fasilitas
+              <div className="absolute top-full left-0 mt-1.5 w-64 bg-white/98 backdrop-blur-md rounded-xl border border-zinc-200 shadow-xl py-1 z-30 animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-3 py-1.5 border-b border-zinc-100">
+                  <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+                    Pilih Lokasi Fasilitas
+                  </span>
                 </div>
                 {FACILITY_LOCATIONS.map((loc) => {
-                  const isSelected = (selectedLocationId || "gi-gandul") === loc.id;
+                  const isSelected = loc.id === selectedLocationId;
                   return (
                     <button
                       key={loc.id}
@@ -774,371 +868,64 @@ export function CCTV3DLocator({
           </div>
         </div>
 
-        {/* Right: Camera Action Controls & Lock/Unlock Toggle */}
+        {/* Right: 3D Character Controls & Reset Button */}
         <div className="relative z-10 flex items-center gap-1.5 pointer-events-auto">
-          {isActivated ? (
-            <div className="flex items-center gap-1.5 bg-[#003B5C] text-white px-2.5 py-1 rounded-lg border border-sky-400/30 shadow-xs animate-in fade-in zoom-in-95 duration-150">
-              <span className="relative flex size-2">
-                <span className="animate-ping absolute inline-flex size-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-[11px] font-semibold text-sky-100 hidden sm:inline">
-                Navigasi Aktif
-              </span>
-              <button
-                onClick={() => setIsActivated(false)}
-                title="Kunci navigasi (Esc / Klik di luar)"
-                className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white/15 hover:bg-white/25 text-white text-[11px] font-medium transition-colors cursor-pointer"
-              >
-                <Lock className="size-3 text-amber-300" />
-                <span>Kunci</span>
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setIsActivated(true)}
-              title="Klik untuk mengaktifkan navigasi 3D"
-              className="flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-2.5 py-1.5 rounded-lg border border-zinc-200/80 shadow-xs text-xs font-medium text-zinc-700 hover:text-zinc-900 hover:bg-zinc-50 transition-colors cursor-pointer"
-            >
-              <Unlock className="size-3 text-[#00A2E9]" />
-              <span className="text-[11px] font-medium">Aktifkan 3D</span>
-            </button>
-          )}
-
-          {/* Blender View Presets (Front, Side, Top, ISO) */}
-          <div className="flex items-center gap-0.5 bg-white/95 backdrop-blur-md p-0.5 rounded-lg border border-zinc-200/80 shadow-xs">
-            <button
-              type="button"
-              onClick={handleViewFront}
-              title="Tampak Depan (Blender Numpad 1)"
-              className={cn(
-                "px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer",
-                viewMode === "front"
-                  ? "bg-zinc-900 text-white font-semibold shadow-xs"
-                  : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
-              )}
-            >
-              Depan (1)
-            </button>
-            <button
-              type="button"
-              onClick={handleViewSide}
-              title="Tampak Samping (Blender Numpad 3)"
-              className={cn(
-                "px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer",
-                viewMode === "side"
-                  ? "bg-zinc-900 text-white font-semibold shadow-xs"
-                  : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
-              )}
-            >
-              Samping (3)
-            </button>
-            <button
-              type="button"
-              onClick={handleViewTop}
-              title="Tampak Atas / Denah (Blender Numpad 7)"
-              className={cn(
-                "px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer",
-                viewMode === "top"
-                  ? "bg-zinc-900 text-white font-semibold shadow-xs"
-                  : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
-              )}
-            >
-              Atas (7)
-            </button>
-            <button
-              type="button"
-              onClick={handleResetCamera}
-              title="Perspektif ISO 3D (Blender Numpad 5)"
-              className={cn(
-                "px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer",
-                viewMode === "iso"
-                  ? "bg-zinc-900 text-white font-semibold shadow-xs"
-                  : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
-              )}
-            >
-              ISO (5)
-            </button>
+          <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-200/80 shadow-xs">
+            <span className="relative flex size-2">
+              <span className="animate-ping absolute inline-flex size-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
+            </span>
+            <span className="text-xs font-semibold text-zinc-900 hidden sm:inline">
+              Karakter 3D
+            </span>
+            <span className="text-zinc-300 hidden sm:inline">•</span>
+            <span className="text-[11px] text-zinc-600 font-medium hidden md:inline">
+              <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px]">W</kbd>
+              <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] ml-0.5">A</kbd>
+              <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] ml-0.5">S</kbd>
+              <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] ml-0.5">D</kbd> Jalan
+            </span>
+            <span className="text-zinc-300 hidden md:inline">•</span>
+            <span className="text-[11px] text-zinc-600 font-medium hidden md:inline">
+              <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px]">Shift</kbd> Lari
+            </span>
+            <span className="text-zinc-300 hidden sm:inline">•</span>
+            <span className="text-[11px] text-zinc-600 font-medium">
+              🖱️ Arah Pandang
+            </span>
           </div>
 
-          {/* Action Tools: Focus (Frame Selected), POV (Camera View), Help */}
-          <div className="flex items-center gap-1 bg-white/95 backdrop-blur-md p-0.5 rounded-lg border border-zinc-200/80 shadow-xs">
-            <button
-              type="button"
-              onClick={handleFocusSelected}
-              title="Fokus Objek Terpilih (Blender Numpad . / F)"
-              className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition-colors cursor-pointer"
-            >
-              <Crosshair className="size-3.5 text-[#00A2E9]" />
-              <span className="hidden sm:inline">Fokus ( . )</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleTogglePOV}
-              title={
-                isPOVMode
-                  ? "Keluar dari POV Kamera (Numpad 0 / Esc)"
-                  : "Sudut Pandang Lensa Kamera CCTV (Blender Numpad 0)"
-              }
-              className={cn(
-                "flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer",
-                isPOVMode
-                  ? "bg-[#00A2E9] text-white font-semibold shadow-xs"
-                  : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"
-              )}
-            >
-              <Camera className="size-3.5" />
-              <span className="hidden sm:inline">POV (0)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowBlenderHelp(!showBlenderHelp)}
-              title="Bantuan Navigasi Blender (Mouse & Shortcut)"
-              className={cn(
-                "p-1.5 rounded text-xs transition-colors cursor-pointer",
-                showBlenderHelp
-                  ? "bg-sky-100 text-[#00A2E9] font-bold"
-                  : "text-zinc-600 hover:bg-zinc-100"
-              )}
-            >
-              <Keyboard className="size-3.5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setAutoRotate(!autoRotate)}
-              title="Toggle Auto-Rotate"
-              className={`p-1.5 rounded text-xs transition-colors cursor-pointer ${
-                autoRotate ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-100"
-              }`}
-            >
-              <Compass className="size-3.5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleResetCamera}
-              title="Reset Sudut Pandang Kamera"
-              className="p-1.5 rounded text-xs text-zinc-600 hover:bg-zinc-100 transition-colors cursor-pointer"
-            >
-              <RotateCcw className="size-3.5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleResetCharacter}
+            title="Reset Posisi Karakter ke Tengah Ruangan (R)"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/95 backdrop-blur-md border border-zinc-200/80 shadow-xs text-xs font-medium text-zinc-700 hover:text-zinc-900 hover:bg-zinc-50 transition-colors cursor-pointer"
+          >
+            <RotateCcw className="size-3.5 text-[#00A2E9]" />
+            <span className="text-[11px] hidden sm:inline">Reset (R)</span>
+          </button>
         </div>
       </div>
 
-      {/* Active POV Mode HUD Banner */}
-      {isPOVMode && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-zinc-950/90 backdrop-blur-md border border-cyan-400/40 text-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-150 pointer-events-auto">
-          <span className="relative flex size-2">
-            <span className="animate-ping absolute inline-flex size-full rounded-full bg-cyan-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full size-2 bg-cyan-500"></span>
-          </span>
-          <span className="text-[11px] font-medium tracking-tight text-cyan-200">
-            POV Lensa:{" "}
-            <strong className="text-white font-semibold">
-              {cctvList.find((c) => c.id === selectedCCTVId)?.name || "Kamera CCTV"}
-            </strong>{" "}
-            <span className="text-cyan-300 font-mono text-[10px]">
-              ({cctvList.find((c) => c.id === selectedCCTVId)?.sn || ""})
-            </span>
-          </span>
-          <button
-            type="button"
-            onClick={handleTogglePOV}
-            className="ml-1 px-2.5 py-0.5 rounded-full bg-white/20 hover:bg-white/30 text-[10px] font-semibold text-white transition-colors cursor-pointer"
-          >
-            Keluar POV (0 / Esc)
-          </button>
-        </div>
-      )}
-
-      {/* Blender Navigation Help Modal */}
-      {showBlenderHelp && (
-        <div className="absolute top-14 right-3 z-40 w-80 rounded-2xl border border-zinc-200 bg-white/98 backdrop-blur-md p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150 pointer-events-auto text-zinc-900">
-          <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-zinc-100">
-            <div className="flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-lg bg-sky-50 text-[#00A2E9] border border-sky-100">
-                <Keyboard className="size-3.5" />
-              </span>
-              <span className="text-xs font-bold text-zinc-900">
-                Navigasi Kamera Blender
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowBlenderHelp(false)}
-              className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
-            >
-              <X className="size-3.5" />
-            </button>
-          </div>
-
-          <div className="space-y-2 text-[11px]">
-            <div className="flex items-start gap-2.5">
-              <span className="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] font-semibold shrink-0">
-                MMB / Drag Kiri
-              </span>
-              <span className="text-zinc-600">
-                <strong className="text-zinc-800">Putar (Orbit 3D)</strong>: Putar bebas ke seluruh sudut termasuk mendongak ke plafon & soffit.
-              </span>
-            </div>
-
-            <div className="flex items-start gap-2.5">
-              <span className="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] font-semibold shrink-0">
-                Shift + Drag / RMB
-              </span>
-              <span className="text-zinc-600">
-                <strong className="text-zinc-800">Geser (Pan Layar)</strong>: Geser posisi kamera secara vertikal & horizontal.
-              </span>
-            </div>
-
-            <div className="flex items-start gap-2.5">
-              <span className="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] font-semibold shrink-0">
-                Scroll Wheel
-              </span>
-              <span className="text-zinc-600">
-                <strong className="text-zinc-800">Zoom Dekat/Jauh</strong>: Perbesar hingga jarak 20cm untuk inspeksi detail bracket & lensa.
-              </span>
-            </div>
-
-            <div className="flex items-start gap-2.5">
-              <span className="px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 text-[#00A2E9] font-mono text-[10px] font-semibold shrink-0">
-                . / F
-              </span>
-              <span className="text-zinc-600">
-                <strong className="text-zinc-800">Fokus Objek</strong>: Pusatkan orbit putar tepat pada unit CCTV yang sedang dipilih.
-              </span>
-            </div>
-
-            <div className="flex items-start gap-2.5">
-              <span className="px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 text-[#00A2E9] font-mono text-[10px] font-semibold shrink-0">
-                0 (Numpad 0)
-              </span>
-              <span className="text-zinc-600">
-                <strong className="text-zinc-800">POV Kamera</strong>: Masuk ke sudut pandang langsung lensa CCTV yang aktif.
-              </span>
-            </div>
-
-            <div className="flex items-start gap-2.5">
-              <span className="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] font-semibold shrink-0">
-                1 / 3 / 7 / 5
-              </span>
-              <span className="text-zinc-600">
-                <strong className="text-zinc-800">Preset View</strong>: Tampak Depan (1), Samping (3), Atas (7), ISO (5).
-              </span>
-            </div>
-
-            <div className="flex items-start gap-2.5">
-              <span className="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] font-semibold shrink-0">
-                WASD / Panah
-              </span>
-              <span className="text-zinc-600">
-                <strong className="text-zinc-800">Jalan / Nudge</strong>: Geser posisi kamera langkah demi langkah (Shift = lebih cepat).
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3D WebGL Canvas Mount Container */}
-      <div
-        ref={mountRef}
-        className={`size-full transition-opacity duration-200 ${
-          isActivated
-            ? "cursor-grab active:cursor-grabbing pointer-events-auto"
-            : "pointer-events-none opacity-95"
-        }`}
-      />
-
-      {/* Inactive Double-Click Shield Overlay */}
-      {!isActivated && (
-        <div
-          onDoubleClick={() => setIsActivated(true)}
-          className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-zinc-950/[0.03] backdrop-blur-[0.5px] cursor-pointer select-none transition-all group"
-          title="Klik 2x untuk Mengaktifkan Navigasi 3D"
-        >
-          <div className="flex flex-col items-center gap-2.5 px-5 py-3.5 rounded-2xl bg-white/95 backdrop-blur-md border border-zinc-200/90 shadow-md text-center transition-all group-hover:scale-105 group-hover:shadow-lg group-hover:border-[#00A2E9]/40 pointer-events-auto">
-            <div className="flex items-center gap-2.5">
-              <span className="flex size-8 items-center justify-center rounded-xl bg-sky-50 text-[#00A2E9] border border-sky-100 shadow-xs">
-                <MousePointerClick className="size-4 animate-bounce" />
-              </span>
-              <div className="text-left">
-                <span className="block text-xs font-semibold text-zinc-900 tracking-tight">
-                  Klik 2x untuk Mengaktifkan Navigasi 3D
-                </span>
-                <span className="block text-[11px] text-zinc-500">
-                  Navigasi dikunci agar tidak mengganggu scrolling halaman
-                </span>
-              </div>
-            </div>
-
-            <div className="w-full flex items-center justify-between gap-3 pt-2 mt-0.5 border-t border-zinc-100">
-              <span className="text-[10px] text-zinc-400 font-medium">
-                Double click area peta
-              </span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsActivated(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#00A2E9] hover:bg-[#0086c4] text-white text-[11px] font-medium shadow-xs transition-colors cursor-pointer"
-              >
-                <Unlock className="size-3" />
-                Aktifkan Sekarang
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom Floating Legend & Selected Unit Summary */}
-      <div className="absolute bottom-3 inset-x-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        {/* Selected CCTV Indicator */}
-        {selectedCCTVId ? (
-          <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-200/80 shadow-xs flex items-center gap-2 pointer-events-auto">
-            <Eye className="size-4 text-[#00A2E9]" />
-            <span className="text-xs text-zinc-500">Kamera Terpilih:</span>
+      {/* Bottom Floating Area: Nearby CCTV Badge & Status Legend */}
+      <div className="absolute bottom-3 inset-x-3 z-10 flex items-center justify-between gap-2 pointer-events-none">
+        {/* Left: Nearby CCTV Alert */}
+        {nearbyCCTV ? (
+          <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-sky-300/80 shadow-xs flex items-center gap-2 pointer-events-auto animate-in fade-in slide-in-from-bottom-2 duration-150">
+            <span className="size-2 rounded-full bg-[#00A2E9] animate-pulse" />
+            <span className="text-xs text-zinc-500">Kamera Terdekat:</span>
             <span className="text-xs font-semibold text-zinc-900">
-              {cctvList.find((c) => c.id === selectedCCTVId)?.name}
+              {nearbyCCTV.name}
             </span>
-            <span className="text-[11px] text-zinc-400 font-mono">
-              ({cctvList.find((c) => c.id === selectedCCTVId)?.sn})
+            <span className="text-[10px] font-mono text-zinc-400">
+              ({nearbyCCTV.sn})
             </span>
           </div>
         ) : (
-          <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-200/80 shadow-xs flex items-center gap-2 pointer-events-auto">
-            <span className="text-xs text-zinc-400">
-              Klik salah satu pin CCTV 3D di peta atau baris tabel di bawah untuk fokus lokasi.
-            </span>
-          </div>
+          <div />
         )}
 
-        {/* Navigation Hint Pill when active */}
-        {isActivated && (
-          <div className="hidden md:flex items-center gap-2 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-lg border border-zinc-200/80 shadow-xs text-[10px] text-zinc-500 pointer-events-auto">
-            <span>🖱️ MMB: Putar</span>
-            <span className="text-zinc-300">•</span>
-            <span>Shift+Drag / RMB: Geser</span>
-            <span className="text-zinc-300">•</span>
-            <span>Scroll: Zoom</span>
-            <span className="text-zinc-300">•</span>
-            <span>WASD: Jalan</span>
-            <span className="text-zinc-300">•</span>
-            <button
-              type="button"
-              onClick={() => setShowBlenderHelp(true)}
-              className="text-[#00A2E9] font-semibold hover:underline cursor-pointer"
-            >
-              Shortcut Blender (1/3/7/0/.)
-            </button>
-          </div>
-        )}
-
-        {/* Legend */}
+        {/* Right: Status Legend */}
         <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-200/80 shadow-xs flex items-center gap-3 text-[11px] text-zinc-500 pointer-events-auto">
           <span className="flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-[#00A2E9]" />
@@ -1157,10 +944,6 @@ export function CCTV3DLocator({
     </div>
   );
 }
-
-// ============================================================================
-// Procedural Three.js Substation & CCTV Marker Builder Functions
-// ============================================================================
 
 function buildSubstationEnvironment(scene: THREE.Group | THREE.Scene) {
   // 1. Ground Plane
