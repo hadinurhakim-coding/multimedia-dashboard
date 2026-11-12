@@ -799,11 +799,11 @@ function buildSubstationEnvironment(scene: THREE.Group | THREE.Scene) {
 }
 
 function buildAuditoriumEnvironment(parent: THREE.Group | THREE.Scene) {
-  // 1. Auditorium Floor (Carpet/Parquet)
+  // 1. FLOOR — Rich Teal Carpet matching real auditorium photos
   const floorGeo = new THREE.PlaneGeometry(28, 28);
   const floorMat = new THREE.MeshStandardMaterial({
-    color: "#F1F5F9",
-    roughness: 0.8,
+    color: "#0F3F44", // Deep teal green auditorium carpet
+    roughness: 0.9,
     metalness: 0.05,
   });
   const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -812,172 +812,420 @@ function buildAuditoriumEnvironment(parent: THREE.Group | THREE.Scene) {
   floor.receiveShadow = true;
   parent.add(floor);
 
-  // Grid Lines
-  const grid = new THREE.GridHelper(28, 28, "#CBD5E1", "#E2E8F0");
+  // Subtle Carpet Perimeter Border & Aisle Grid
+  const grid = new THREE.GridHelper(26, 26, "#164E53", "#0D3338");
   grid.position.y = 0.01;
   parent.add(grid);
 
-  // Line segment border material
-  const lineMat = new THREE.LineBasicMaterial({ color: "#94A3B8" });
-
-  // 2. Main Elevated Stage (Panggung Utama BOD & RUPS)
-  const stageGeo = new THREE.BoxGeometry(16, 0.8, 8);
-  const stageMat = new THREE.MeshStandardMaterial({
-    color: "#003B5C", // PLN Navy Stage Trim
-    roughness: 0.6,
-    metalness: 0.2,
+  // Center Aisle Runner in Neutral Cream
+  const aisleGeo = new THREE.PlaneGeometry(2.4, 18);
+  const aisleMat = new THREE.MeshStandardMaterial({
+    color: "#134E4A",
+    roughness: 0.85,
   });
-  const stage = new THREE.Mesh(stageGeo, stageMat);
-  stage.position.set(0, 0.4, -7);
-  stage.castShadow = true;
-  stage.receiveShadow = true;
-  parent.add(stage);
+  const aisle = new THREE.Mesh(aisleGeo, aisleMat);
+  aisle.rotation.x = -Math.PI / 2;
+  aisle.position.set(0, 0.02, 1);
+  aisle.receiveShadow = true;
+  parent.add(aisle);
 
-  // Stage Top Surface (Lantai Panggung Kayu/Akustik)
-  const stageTopGeo = new THREE.BoxGeometry(15.8, 0.05, 7.8);
+  // Line segment materials
+  const goldLightMat = new THREE.MeshBasicMaterial({ color: "#FDE047" });
+  const warmDownlightMat = new THREE.MeshBasicMaterial({ color: "#FEF08A" });
+  const woodPanelMat = new THREE.MeshStandardMaterial({
+    color: "#6B3212", // Warm polished teak wood
+    roughness: 0.45,
+    metalness: 0.15,
+  });
+  const tealAcousticMat = new THREE.MeshStandardMaterial({
+    color: "#1D646B", // Sage / teal diamond quilted acoustic panel
+    roughness: 0.8,
+  });
+  const whiteBalconyMat = new THREE.MeshStandardMaterial({
+    color: "#F8FAFC", // Sculpted smooth white balcony pod
+    roughness: 0.25,
+    metalness: 0.05,
+  });
+  const darkRailingMat = new THREE.MeshStandardMaterial({
+    color: "#334155",
+    roughness: 0.3,
+    metalness: 0.85,
+  });
+
+  // 2. MAIN ELEVATED STAGE (Panggung Utama BOD & RUPS)
+  // Stage Tier 1 (Base Teak Fascia)
+  const stageTier1Geo = new THREE.BoxGeometry(17, 0.45, 9);
+  const stageTier1 = new THREE.Mesh(stageTier1Geo, woodPanelMat);
+  stageTier1.position.set(0, 0.225, -7.5);
+  stageTier1.castShadow = true;
+  stageTier1.receiveShadow = true;
+  parent.add(stageTier1);
+
+  // Stage Tier 2 (Top Platform with Cream Birch/Maple Flooring)
+  const stageTier2Geo = new THREE.BoxGeometry(16.4, 0.45, 8.4);
   const stageTopMat = new THREE.MeshStandardMaterial({
-    color: "#FFFFFF",
-    roughness: 0.5,
+    color: "#F5F5F4", // Light cream stage surface
+    roughness: 0.4,
   });
-  const stageTop = new THREE.Mesh(stageTopGeo, stageTopMat);
-  stageTop.position.set(0, 0.82, -7);
-  stageTop.receiveShadow = true;
-  parent.add(stageTop);
+  const stageTier2 = new THREE.Mesh(stageTier2Geo, stageTopMat);
+  stageTier2.position.set(0, 0.675, -7.5);
+  stageTier2.receiveShadow = true;
+  parent.add(stageTier2);
 
-  // 3. Huge LED Video Wall Backdrop (Screen Panggung)
-  const ledWallGeo = new THREE.BoxGeometry(12, 4.5, 0.3);
-  const ledWallMat = new THREE.MeshStandardMaterial({
-    color: "#0F172A",
-    roughness: 0.2,
+  // Front Stage Access Steps
+  const stepsGeo = new THREE.BoxGeometry(16, 0.225, 0.8);
+  const steps = new THREE.Mesh(stepsGeo, woodPanelMat);
+  steps.position.set(0, 0.11, -2.8);
+  steps.receiveShadow = true;
+  parent.add(steps);
+
+  // 3. GIANT CURVED PANORAMIC LED VIDEOTRON (Sesuai Foto 1 & Frame 00)
+  // Videotron Backing Structure
+  const ledBackGeo = new THREE.BoxGeometry(15, 4.8, 0.4);
+  const ledBackMat = new THREE.MeshStandardMaterial({
+    color: "#0B0F19",
+    roughness: 0.3,
     metalness: 0.8,
   });
-  const ledWall = new THREE.Mesh(ledWallGeo, ledWallMat);
-  ledWall.position.set(0, 3.1, -10.5);
-  ledWall.castShadow = true;
-  parent.add(ledWall);
+  const ledBack = new THREE.Mesh(ledBackGeo, ledBackMat);
+  ledBack.position.set(0, 3.3, -11.0);
+  ledBack.castShadow = true;
+  parent.add(ledBack);
 
-  // LED Screen Display Panel (Glow PLN Cyan Frame)
-  const screenFaceGeo = new THREE.PlaneGeometry(11.6, 4.1);
+  // Front Active Screen Panel ("PLN SustainAction 2026" Cyan Electric Display)
+  const screenFaceGeo = new THREE.PlaneGeometry(14.4, 4.2);
   const screenFaceMat = new THREE.MeshBasicMaterial({
-    color: "#003B5C",
+    color: "#00A2E9", // Vibrant PLN Cyan glow
   });
   const screenFace = new THREE.Mesh(screenFaceGeo, screenFaceMat);
-  screenFace.position.set(0, 3.1, -10.34);
+  screenFace.position.set(0, 3.3, -10.79);
   parent.add(screenFace);
 
-  // Cyan & Electric Yellow Accent Lines on LED Wall
-  const cyanBarGeo = new THREE.BoxGeometry(11.8, 0.1, 0.05);
-  const cyanBarMat = new THREE.MeshBasicMaterial({ color: "#00A2E9" });
-  const topBar = new THREE.Mesh(cyanBarGeo, cyanBarMat);
-  topBar.position.set(0, 5.25, -10.33);
-  parent.add(topBar);
+  // Inner Cyan Graphic Header Line
+  const cyanHeaderGeo = new THREE.BoxGeometry(14.5, 0.12, 0.05);
+  const cyanHeaderMat = new THREE.MeshBasicMaterial({ color: "#38BDF8" });
+  const cyanHeader = new THREE.Mesh(cyanHeaderGeo, cyanHeaderMat);
+  cyanHeader.position.set(0, 5.35, -10.78);
+  parent.add(cyanHeader);
 
-  const bottomBar = new THREE.Mesh(cyanBarGeo, cyanBarMat);
-  bottomBar.position.set(0, 0.95, -10.33);
-  parent.add(bottomBar);
+  // Digital Clock ("12 35") & Green EXIT Sign centered beneath screen (as in Photo 1)
+  const clockGeo = new THREE.BoxGeometry(0.9, 0.35, 0.1);
+  const clockMat = new THREE.MeshBasicMaterial({ color: "#ED1C24" }); // Red LED digital clock
+  const clock = new THREE.Mesh(clockGeo, clockMat);
+  clock.position.set(0, 0.98, -10.75);
+  parent.add(clock);
 
-  // 4. Podiums / Mimbar Direksi di Panggung
-  const podiumGeo = new THREE.BoxGeometry(1.2, 1.2, 0.8);
-  const podiumMat = new THREE.MeshStandardMaterial({
-    color: "#00A2E9",
-    roughness: 0.3,
-    metalness: 0.4,
-  });
-  const podium = new THREE.Mesh(podiumGeo, podiumMat);
-  podium.position.set(0, 1.4, -6.5);
+  const exitSignGeo = new THREE.BoxGeometry(0.6, 0.2, 0.05);
+  const exitSignMat = new THREE.MeshBasicMaterial({ color: "#10B981" }); // Green EXIT
+  const exitSign = new THREE.Mesh(exitSignGeo, exitSignMat);
+  exitSign.position.set(0, 1.25, -10.75);
+  parent.add(exitSign);
+
+  // 4 Top Downlights shining on the stage & videotron
+  for (const dlX of [-4.5, -1.5, 1.5, 4.5]) {
+    const dlGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.05, 16);
+    const dl = new THREE.Mesh(dlGeo, warmDownlightMat);
+    dl.position.set(dlX, 5.65, -10.7);
+    parent.add(dl);
+  }
+
+  // Indonesian National Flags (Merah Putih) flanking stage left & right
+  for (const flagX of [-7.6, 7.6]) {
+    // Flag pole
+    const poleGeo = new THREE.CylinderGeometry(0.04, 0.04, 3.2, 12);
+    const poleMat = new THREE.MeshStandardMaterial({ color: "#E2E8F0", metalness: 0.9 });
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.set(flagX, 2.5, -9.8);
+    parent.add(pole);
+
+    // Red flag top
+    const redGeo = new THREE.BoxGeometry(0.02, 0.5, 0.8);
+    const redMat = new THREE.MeshStandardMaterial({ color: "#ED1C24" });
+    const redFlag = new THREE.Mesh(redGeo, redMat);
+    redFlag.position.set(flagX + 0.4, 3.8, -9.8);
+    parent.add(redFlag);
+
+    // White flag bottom
+    const whiteGeo = new THREE.BoxGeometry(0.02, 0.5, 0.8);
+    const whiteMat = new THREE.MeshStandardMaterial({ color: "#FFFFFF" });
+    const whiteFlag = new THREE.Mesh(whiteGeo, whiteMat);
+    whiteFlag.position.set(flagX + 0.4, 3.3, -9.8);
+    parent.add(whiteFlag);
+  }
+
+  // 4 White Executive VIP Armchairs / Sofas on Stage (Frame 00)
+  for (let sIdx = 0; sIdx < 4; sIdx++) {
+    const chairX = -3.0 + sIdx * 2.0;
+    const sofaGeo = new THREE.BoxGeometry(0.9, 0.65, 0.8);
+    const sofaMat = new THREE.MeshStandardMaterial({
+      color: "#FFFFFF",
+      roughness: 0.35,
+    });
+    const sofa = new THREE.Mesh(sofaGeo, sofaMat);
+    sofa.position.set(chairX, 1.25, -7.2);
+    sofa.castShadow = true;
+    parent.add(sofa);
+
+    // Sofa backrest
+    const backGeo = new THREE.BoxGeometry(0.9, 0.5, 0.2);
+    const back = new THREE.Mesh(backGeo, sofaMat);
+    back.position.set(chairX, 1.65, -7.5);
+    parent.add(back);
+  }
+
+  // Mimbar / Podium Pidato BOD di sisi panggung
+  const podiumGeo = new THREE.BoxGeometry(0.9, 1.1, 0.7);
+  const podium = new THREE.Mesh(podiumGeo, woodPanelMat);
+  podium.position.set(-5.5, 1.45, -5.8);
   podium.castShadow = true;
   parent.add(podium);
 
-  // 5. VIP Round Tables & Chairs (Area Audiens Depan)
+  // 4. SIDE WALLS WITH SCULPTED WHITE BALCONIES & QUILTED TEAL PANELS
+  // (Sesuai Foto 2, 3 & Frame 11)
+  const sideWallXList = [-11.4, 11.4];
+
+  sideWallXList.forEach((wallX) => {
+    const isLeft = wallX < 0;
+
+    // A. Lower Wall Quilted Teal Acoustic Panels
+    for (const zPanel of [-6, -1.5, 3, 7.5]) {
+      const panelGeo = new THREE.BoxGeometry(0.15, 2.8, 3.6);
+      const panel = new THREE.Mesh(panelGeo, tealAcousticMat);
+      panel.position.set(wallX, 1.8, zPanel);
+      parent.add(panel);
+
+      // Gold sconce lamp on each acoustic panel bay
+      const sconceGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.2, 12);
+      const sconce = new THREE.Mesh(sconceGeo, goldLightMat);
+      sconce.position.set(isLeft ? wallX + 0.15 : wallX - 0.15, 2.2, zPanel);
+      parent.add(sconce);
+
+      // Architectural Teak Wood Column / Pilaster
+      const colGeo = new THREE.CylinderGeometry(0.22, 0.22, 3.6, 16);
+      const col = new THREE.Mesh(colGeo, woodPanelMat);
+      col.position.set(isLeft ? wallX + 0.18 : wallX - 0.18, 1.8, zPanel + 2.0);
+      parent.add(col);
+    }
+
+    // B. Teak Wood Double Doors (Pintu Keluar Aula)
+    const doorGeo = new THREE.BoxGeometry(0.2, 2.4, 1.8);
+    const door = new THREE.Mesh(doorGeo, woodPanelMat);
+    door.position.set(wallX, 1.2, 1.0);
+    parent.add(door);
+
+    // C. SCULPTED CURVED WHITE MEZZANINE BALCONIES (Balkon Melengkung Putih)
+    // Sesuai Foto 2, 3 & Frame 11
+    for (const zBalcony of [-3.5, 2.5, 8.0]) {
+      // Main curved pod overhang
+      const podGeo = new THREE.BoxGeometry(1.6, 1.1, 4.6);
+      const pod = new THREE.Mesh(podGeo, whiteBalconyMat);
+      pod.position.set(isLeft ? wallX + 0.8 : wallX - 0.8, 4.2, zBalcony);
+      pod.castShadow = true;
+      parent.add(pod);
+
+      // Underside Soffit with warm downlights
+      const soffitGeo = new THREE.BoxGeometry(1.5, 0.08, 4.4);
+      const soffit = new THREE.Mesh(soffitGeo, woodPanelMat);
+      soffit.position.set(isLeft ? wallX + 0.8 : wallX - 0.8, 3.62, zBalcony);
+      parent.add(soffit);
+
+      // Downlights under the balcony soffit
+      for (const dlOffset of [-1.5, 0, 1.5]) {
+        const blDownlightGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.05, 12);
+        const blDownlight = new THREE.Mesh(blDownlightGeo, warmDownlightMat);
+        blDownlight.position.set(isLeft ? wallX + 0.8 : wallX - 0.8, 3.58, zBalcony + dlOffset);
+        parent.add(blDownlight);
+      }
+
+      // Dark Balcony Railing on top
+      const railGeo = new THREE.BoxGeometry(0.06, 0.6, 4.5);
+      const rail = new THREE.Mesh(railGeo, darkRailingMat);
+      rail.position.set(isLeft ? wallX + 1.55 : wallX - 1.55, 5.05, zBalcony);
+      parent.add(rail);
+    }
+
+    // D. Upper Wood Grid Wainscoting Panel above balcony
+    const upperWoodGeo = new THREE.BoxGeometry(0.1, 2.2, 24);
+    const upperWood = new THREE.Mesh(upperWoodGeo, woodPanelMat);
+    upperWood.position.set(wallX, 6.4, 0);
+    parent.add(upperWood);
+  });
+
+  // 5. VAULTED SLOPED TIMBER CEILING RAFTERS (Atap Balok Kayu Sloped)
+  const ceilingRafterMat = new THREE.MeshStandardMaterial({
+    color: "#3B1B0B", // Dark exposed timber rafters
+    roughness: 0.6,
+  });
+
+  for (const zRafter of [-9, -5, -1, 3, 7, 11]) {
+    // Left sloped rafter beam
+    const leftRafterPts = [
+      new THREE.Vector3(-11.4, 6.8, zRafter),
+      new THREE.Vector3(0, 8.2, zRafter),
+    ];
+    const leftRafterGeo = new THREE.BufferGeometry().setFromPoints(leftRafterPts);
+    const leftRafterLine = new THREE.Line(leftRafterGeo, new THREE.LineBasicMaterial({ color: "#5F2C10", linewidth: 3 }));
+    parent.add(leftRafterLine);
+
+    // Right sloped rafter beam
+    const rightRafterPts = [
+      new THREE.Vector3(11.4, 6.8, zRafter),
+      new THREE.Vector3(0, 8.2, zRafter),
+    ];
+    const rightRafterGeo = new THREE.BufferGeometry().setFromPoints(rightRafterPts);
+    const rightRafterLine = new THREE.Line(rightRafterGeo, new THREE.LineBasicMaterial({ color: "#5F2C10", linewidth: 3 }));
+    parent.add(rightRafterLine);
+
+    // Timber tie beam
+    const tieGeo = new THREE.BoxGeometry(22, 0.18, 0.18);
+    const tieBeam = new THREE.Mesh(tieGeo, ceilingRafterMat);
+    tieBeam.position.set(0, 7.0, zRafter);
+    parent.add(tieBeam);
+  }
+
+  // 6. PROFESSIONAL ALUMINUM STAGE LIGHTING TRUSS RIG (Frame 00)
+  const trussAluminumMat = new THREE.MeshStandardMaterial({
+    color: "#94A3B8",
+    roughness: 0.35,
+    metalness: 0.8,
+  });
+
+  // Main Cross-Stage Box Truss (Suspended at y = 5.8)
+  for (const zTruss of [-5.5, -2.0]) {
+    const trussMainGeo = new THREE.BoxGeometry(16, 0.35, 0.35);
+    const trussMain = new THREE.Mesh(trussMainGeo, trussAluminumMat);
+    trussMain.position.set(0, 5.8, zTruss);
+    parent.add(trussMain);
+
+    // Suspended moving head spotlights with radiating light beams
+    for (const spotX of [-5.5, -3.0, 0, 3.0, 5.5]) {
+      // Spot fixture housing
+      const spotGeo = new THREE.CylinderGeometry(0.16, 0.22, 0.32, 12);
+      const spotMat = new THREE.MeshStandardMaterial({ color: "#1E293B", roughness: 0.2 });
+      const spot = new THREE.Mesh(spotGeo, spotMat);
+      spot.position.set(spotX, 5.5, zTruss);
+      parent.add(spot);
+
+      // Angled light beam radiating down towards stage
+      const beamGeo = new THREE.ConeGeometry(1.6, 5.2, 16, 1, true);
+      beamGeo.translate(0, -2.6, 0);
+      const beamMat = new THREE.MeshBasicMaterial({
+        color: spotX === 0 ? "#00A2E9" : spotX < 0 ? "#38BDF8" : "#10B981",
+        transparent: true,
+        opacity: 0.12,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const beam = new THREE.Mesh(beamGeo, beamMat);
+      beam.position.set(spotX, 5.4, zTruss);
+      beam.rotation.x = Math.PI / 12; // tilted down toward stage
+      parent.add(beam);
+    }
+  }
+
+  // 7. VIP ROUND BANQUET TABLES & AUDIENCE CHAIRS (Area Audiens Sesuai Foto & Video)
   const tablePositions = [
-    [-4, -2],
-    [0, -2],
-    [4, -2],
-    [-2, 1],
-    [2, 1],
+    [-4.5, -1.5],
+    [0, -1.5],
+    [4.5, -1.5],
+    [-6.5, 2.0],
+    [-2.2, 2.0],
+    [2.2, 2.0],
+    [6.5, 2.0],
+    [-4.5, 5.5],
+    [0, 5.5],
+    [4.5, 5.5],
   ];
+
+  const tableClothMat = new THREE.MeshStandardMaterial({
+    color: "#FAF5FF", // Cream/white banquet tablecloth
+    roughness: 0.6,
+  });
+
+  const banquetChairMat = new THREE.MeshStandardMaterial({
+    color: "#6B3212", // Teak wood chair frame
+    roughness: 0.5,
+  });
 
   tablePositions.forEach(([tx, tz]) => {
-    // Round table disc
-    const tableGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.1, 24);
-    const tableMat = new THREE.MeshStandardMaterial({ color: "#FFFFFF", roughness: 0.6 });
-    const table = new THREE.Mesh(tableGeo, tableMat);
-    table.position.set(tx, 0.7, tz);
-    table.castShadow = true;
-    table.receiveShadow = true;
-    parent.add(table);
+    // Round table with flowing tablecloth
+    const tableTopGeo = new THREE.CylinderGeometry(1.05, 1.05, 0.08, 24);
+    const tableTop = new THREE.Mesh(tableTopGeo, tableClothMat);
+    tableTop.position.set(tx, 0.72, tz);
+    tableTop.castShadow = true;
+    tableTop.receiveShadow = true;
+    parent.add(tableTop);
 
-    // Table leg
-    const legGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.7, 12);
-    const legMat = new THREE.MeshStandardMaterial({ color: "#64748B" });
-    const leg = new THREE.Mesh(legGeo, legMat);
-    leg.position.set(tx, 0.35, tz);
-    parent.add(leg);
+    // Table skirt drape
+    const drapeGeo = new THREE.CylinderGeometry(1.02, 1.04, 0.68, 24, 1, true);
+    const drape = new THREE.Mesh(drapeGeo, tableClothMat);
+    drape.position.set(tx, 0.35, tz);
+    parent.add(drape);
 
-    // Small centerpiece marker
-    const centerGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.15, 12);
-    const centerMat = new THREE.MeshBasicMaterial({ color: "#FFD100" });
-    const center = new THREE.Mesh(centerGeo, centerMat);
-    center.position.set(tx, 0.8, tz);
-    parent.add(center);
+    // Center floral centerpiece (as seen in Image 2)
+    const flowerGeo = new THREE.SphereGeometry(0.22, 12, 12);
+    const flowerMat = new THREE.MeshStandardMaterial({ color: "#FBBF24", roughness: 0.8 });
+    const flower = new THREE.Mesh(flowerGeo, flowerMat);
+    flower.position.set(tx, 0.88, tz);
+    parent.add(flower);
+
+    // 4 Banquet chairs around each table
+    for (let cAngle = 0; cAngle < Math.PI * 2; cAngle += Math.PI / 2) {
+      const cx = tx + Math.cos(cAngle) * 1.35;
+      const cz = tz + Math.sin(cAngle) * 1.35;
+
+      const chairSeatGeo = new THREE.BoxGeometry(0.38, 0.06, 0.38);
+      const chairSeat = new THREE.Mesh(chairSeatGeo, banquetChairMat);
+      chairSeat.position.set(cx, 0.42, cz);
+      parent.add(chairSeat);
+
+      const chairBackGeo = new THREE.BoxGeometry(0.38, 0.45, 0.05);
+      const chairBack = new THREE.Mesh(chairBackGeo, banquetChairMat);
+      chairBack.position.set(cx, 0.68, cz + 0.16);
+      parent.add(chairBack);
+    }
   });
 
-  // 6. Audience Seating Tier (Area Audiens Belakang)
-  const rows = [
-    { z: 3.5, width: 14 },
-    { z: 5.5, width: 16 },
-  ];
-  rows.forEach((row, rIdx) => {
-    const seatRowGeo = new THREE.BoxGeometry(row.width, 0.4, 0.8);
-    const seatRowMat = new THREE.MeshStandardMaterial({
-      color: "#E2E8F0",
-      roughness: 0.7,
-    });
-    const seatRow = new THREE.Mesh(seatRowGeo, seatRowMat);
-    seatRow.position.set(0, 0.2 + rIdx * 0.2, row.z);
-    seatRow.castShadow = true;
-    seatRow.receiveShadow = true;
-    parent.add(seatRow);
-  });
+  // Side Catering Buffet Station (Sesuai Foto 2 di sebelah kiri)
+  const buffetGeo = new THREE.BoxGeometry(1.2, 0.75, 4.5);
+  const buffet = new THREE.Mesh(buffetGeo, tableClothMat);
+  buffet.position.set(-9.2, 0.375, -2.5);
+  buffet.castShadow = true;
+  parent.add(buffet);
 
-  // 7. Master Control Booth & Audio Desk (Mezzanine Belakang)
-  const boothGeo = new THREE.BoxGeometry(4.5, 2.5, 2.5);
-  const boothMat = new THREE.MeshStandardMaterial({
+  // PA Audio Speakers on Black Tripods (Sesuai Foto 2 & 3)
+  for (const spkX of [-8.5, 8.5]) {
+    const spkStandGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.8, 8);
+    const spkStandMat = new THREE.MeshStandardMaterial({ color: "#0F172A" });
+    const stand = new THREE.Mesh(spkStandGeo, spkStandMat);
+    stand.position.set(spkX, 0.9, -4.5);
+    parent.add(stand);
+
+    const spkBoxGeo = new THREE.BoxGeometry(0.42, 0.75, 0.38);
+    const spkBox = new THREE.Mesh(spkBoxGeo, spkStandMat);
+    spkBox.position.set(spkX, 2.0, -4.5);
+    parent.add(spkBox);
+  }
+
+  // 8. MASTER CONTROL / FOH BOOTH & AUDIO DESK (Mezzanine Belakang Sesuai Video)
+  const fohGeo = new THREE.BoxGeometry(7.0, 1.4, 2.4);
+  const fohMat = new THREE.MeshStandardMaterial({
     color: "#FFFFFF",
-    roughness: 0.7,
+    roughness: 0.6,
   });
-  const booth = new THREE.Mesh(boothGeo, boothMat);
-  booth.position.set(4.5, 1.25, 4.5);
-  booth.castShadow = true;
-  booth.receiveShadow = true;
-  parent.add(booth);
+  const foh = new THREE.Mesh(fohGeo, fohMat);
+  foh.position.set(0, 0.7, 10.0);
+  foh.castShadow = true;
+  foh.receiveShadow = true;
+  parent.add(foh);
 
-  const boothEdges = new THREE.EdgesGeometry(boothGeo);
-  const boothLines = new THREE.LineSegments(boothEdges, lineMat);
-  boothLines.position.copy(booth.position);
-  parent.add(boothLines);
-
-  // Booth Glass Window / Desk Line
-  const glassGeo = new THREE.BoxGeometry(4.1, 0.8, 0.1);
-  const glassMat = new THREE.MeshStandardMaterial({
-    color: "#00A2E9",
-    transparent: true,
-    opacity: 0.6,
-  });
-  const glass = new THREE.Mesh(glassGeo, glassMat);
-  glass.position.set(4.5, 1.8, 3.2);
-  parent.add(glass);
-
-  // 8. Overhead Lighting Truss Rails (Rig Panggung & Auditorium)
-  const trussMat = new THREE.LineBasicMaterial({ color: "#64748B" });
-  for (const zPos of [-6, -2, 2]) {
-    const trussPts = [
-      new THREE.Vector3(-10, 4.5, zPos),
-      new THREE.Vector3(10, 4.5, zPos),
-    ];
-    const trussGeo = new THREE.BufferGeometry().setFromPoints(trussPts);
-    const trussLine = new THREE.Line(trussGeo, trussMat);
-    parent.add(trussLine);
+  // FOH Screen Monitors
+  for (const monX of [-2.0, 0, 2.0]) {
+    const monGeo = new THREE.BoxGeometry(0.7, 0.45, 0.08);
+    const monMat = new THREE.MeshBasicMaterial({ color: "#00A2E9" });
+    const mon = new THREE.Mesh(monGeo, monMat);
+    mon.position.set(monX, 1.65, 9.8);
+    parent.add(mon);
   }
 }
 
