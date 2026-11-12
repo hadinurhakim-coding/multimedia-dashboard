@@ -1226,32 +1226,7 @@ function buildAuditoriumEnvironment(parent: THREE.Group | THREE.Scene) {
     parent.add(whiteFlag);
   }
 
-  // 4 White Executive VIP Armchairs / Sofas on Stage (Frame 00)
-  for (let sIdx = 0; sIdx < 4; sIdx++) {
-    const chairX = -3.0 + sIdx * 2.0;
-    const sofaGeo = new THREE.BoxGeometry(0.9, 0.65, 0.8);
-    const sofaMat = new THREE.MeshStandardMaterial({
-      color: "#FFFFFF",
-      roughness: 0.35,
-    });
-    const sofa = new THREE.Mesh(sofaGeo, sofaMat);
-    sofa.position.set(chairX, 1.25, -7.2);
-    sofa.castShadow = true;
-    parent.add(sofa);
 
-    // Sofa backrest
-    const backGeo = new THREE.BoxGeometry(0.9, 0.5, 0.2);
-    const back = new THREE.Mesh(backGeo, sofaMat);
-    back.position.set(chairX, 1.65, -7.5);
-    parent.add(back);
-  }
-
-  // Mimbar / Podium Pidato BOD di sisi panggung
-  const podiumGeo = new THREE.BoxGeometry(0.9, 1.1, 0.7);
-  const podium = new THREE.Mesh(podiumGeo, woodPanelMat);
-  podium.position.set(-5.5, 1.45, -5.8);
-  podium.castShadow = true;
-  parent.add(podium);
 
   // 4. SIDE WALLS WITH SCULPTED WHITE BALCONIES & QUILTED TEAL PANELS
   // (Sesuai Foto 2, 3 & Frame 11)
