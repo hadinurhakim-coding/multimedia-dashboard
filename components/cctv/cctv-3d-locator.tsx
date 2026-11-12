@@ -1106,9 +1106,9 @@ function buildAuditoriumEnvironment(parent: THREE.Group | THREE.Scene) {
   const goldLightMat = new THREE.MeshBasicMaterial({ color: "#FDE047" });
   const warmDownlightMat = new THREE.MeshBasicMaterial({ color: "#FEF08A" });
   const woodPanelMat = new THREE.MeshStandardMaterial({
-    color: "#6B3212", // Warm polished teak wood
-    roughness: 0.45,
-    metalness: 0.15,
+    color: "#85441E", // Rich warm teak wood paneling (sesuai foto referensi nyata)
+    roughness: 0.40,
+    metalness: 0.12,
   });
   const tealAcousticMat = new THREE.MeshStandardMaterial({
     color: "#1D646B", // Sage / teal diamond quilted acoustic panel
@@ -1228,56 +1228,111 @@ function buildAuditoriumEnvironment(parent: THREE.Group | THREE.Scene) {
 
 
 
-  // 4. SIDE WALLS WITH SCULPTED WHITE BALCONIES & QUILTED TEAL PANELS
-  // (Sesuai Foto 2, 3 & Frame 11)
+  // 4. ARCHITECTURAL TEAK WOOD WALL CLADDING & BALCONIES (Sesuai Referensi Foto Nyata)
   const sideWallXList = [-11.4, 11.4];
 
   sideWallXList.forEach((wallX) => {
     const isLeft = wallX < 0;
 
-    // A. Lower Wall Quilted Teal Acoustic Panels
+    // A. SOLID CONTINUOUS LOWER WOOD WALL (Dinding Kayu Penuh Bawah)
+    // Menutup seluruh dinding samping dari ujung panggung (z = -11.5) sampai pintu belakang (z = 13.5)
+    // tanpa ada celah putih yang bocor.
+    const lowerWoodWallGeo = new THREE.BoxGeometry(0.12, 3.65, 25.0);
+    const lowerWoodWall = new THREE.Mesh(lowerWoodWallGeo, woodPanelMat);
+    lowerWoodWall.position.set(wallX, 1.825, 1.0);
+    lowerWoodWall.receiveShadow = true;
+    parent.add(lowerWoodWall);
+
+    // B. Architectural Wood Paneling Seams & Moldings (Grid Garis Profil Kayu)
+    const friezeMoldingGeo = new THREE.BoxGeometry(0.16, 0.10, 25.0);
+    const friezeMolding = new THREE.Mesh(friezeMoldingGeo, woodPanelMat);
+    friezeMolding.position.set(wallX, 2.7, 1.0);
+    parent.add(friezeMolding);
+
+    const baseboardGeo = new THREE.BoxGeometry(0.16, 0.16, 25.0);
+    const baseboard = new THREE.Mesh(baseboardGeo, woodPanelMat);
+    baseboard.position.set(wallX, 0.08, 1.0);
+    parent.add(baseboard);
+
+    // C. Quilted Teal Acoustic Accent Panels (Tertanam di dalam Dinding Kayu)
     for (const zPanel of [-6, -1.5, 3, 7.5]) {
-      const panelGeo = new THREE.BoxGeometry(0.15, 2.8, 3.6);
+      // Panel akustik teal di atas dinding kayu
+      const panelGeo = new THREE.BoxGeometry(0.08, 2.3, 3.5);
       const panel = new THREE.Mesh(panelGeo, tealAcousticMat);
-      panel.position.set(wallX, 1.8, zPanel);
+      panel.position.set(isLeft ? wallX + 0.08 : wallX - 0.08, 1.45, zPanel);
+      panel.castShadow = true;
+      panel.receiveShadow = true;
       parent.add(panel);
 
-      // Gold sconce lamp on each acoustic panel bay
+      // Bingkai lis kayu di atas dan bawah panel teal
+      const frameHorizGeo = new THREE.BoxGeometry(0.12, 0.08, 3.6);
+      const frameTop = new THREE.Mesh(frameHorizGeo, woodPanelMat);
+      frameTop.position.set(isLeft ? wallX + 0.08 : wallX - 0.08, 2.62, zPanel);
+      parent.add(frameTop);
+
+      const frameBot = new THREE.Mesh(frameHorizGeo, woodPanelMat);
+      frameBot.position.set(isLeft ? wallX + 0.08 : wallX - 0.08, 0.28, zPanel);
+      parent.add(frameBot);
+
+      // Lampu sconce dinding emas di tengah panel
       const sconceGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.2, 12);
       const sconce = new THREE.Mesh(sconceGeo, goldLightMat);
-      sconce.position.set(isLeft ? wallX + 0.15 : wallX - 0.15, 2.2, zPanel);
+      sconce.position.set(isLeft ? wallX + 0.15 : wallX - 0.15, 1.8, zPanel);
       parent.add(sconce);
 
-      // Architectural Teak Wood Column / Pilaster
-      const colGeo = new THREE.CylinderGeometry(0.22, 0.22, 3.6, 16);
+      // Downlights plafon di area atas panel teal (menghilangkan area putih atas)
+      // Sesuai deretan lampu downlight bundar di foto referensi nyata
+      for (const dlZ of [-1.2, -0.6, 0, 0.6, 1.2]) {
+        const friezeDownlightGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.04, 12);
+        const friezeDownlight = new THREE.Mesh(friezeDownlightGeo, warmDownlightMat);
+        friezeDownlight.position.set(isLeft ? wallX + 0.12 : wallX - 0.12, 3.58, zPanel + dlZ);
+        parent.add(friezeDownlight);
+      }
+
+      // Kolom / Pilar Kayu Jati Arsitektural antara panel
+      const colGeo = new THREE.CylinderGeometry(0.24, 0.24, 3.65, 16);
       const col = new THREE.Mesh(colGeo, woodPanelMat);
-      col.position.set(isLeft ? wallX + 0.18 : wallX - 0.18, 1.8, zPanel + 2.0);
+      col.position.set(isLeft ? wallX + 0.22 : wallX - 0.22, 1.825, zPanel + 2.0);
+      col.castShadow = true;
       parent.add(col);
     }
 
-    // B. Teak Wood Double Doors (Pintu Keluar Aula)
-    const doorGeo = new THREE.BoxGeometry(0.2, 2.4, 1.8);
+    // Pilar sudut tambahan di dekat panggung dan dekat pintu belakang
+    for (const zEnd of [-9.5, 11.5]) {
+      const endColGeo = new THREE.CylinderGeometry(0.24, 0.24, 3.65, 16);
+      const endCol = new THREE.Mesh(endColGeo, woodPanelMat);
+      endCol.position.set(isLeft ? wallX + 0.22 : wallX - 0.22, 1.825, zEnd);
+      endCol.castShadow = true;
+      parent.add(endCol);
+    }
+
+    // D. Pintu Ganda Kayu Jati dengan Architrave Kayu Tebal
+    const doorFrameGeo = new THREE.BoxGeometry(0.24, 2.6, 2.1);
+    const doorFrame = new THREE.Mesh(doorFrameGeo, woodPanelMat);
+    doorFrame.position.set(isLeft ? wallX + 0.05 : wallX - 0.05, 1.3, 1.0);
+    parent.add(doorFrame);
+
+    const doorGeo = new THREE.BoxGeometry(0.18, 2.4, 1.8);
     const door = new THREE.Mesh(doorGeo, woodPanelMat);
-    door.position.set(wallX, 1.2, 1.0);
+    door.position.set(isLeft ? wallX + 0.1 : wallX - 0.1, 1.2, 1.0);
     parent.add(door);
 
-    // C. SCULPTED CURVED WHITE MEZZANINE BALCONIES (Balkon Melengkung Putih)
-    // Sesuai Foto 2, 3 & Frame 11
+    // E. Soffit Balkon Menerus & Balkon Melengkung Putih
+    const continuousSoffitGeo = new THREE.BoxGeometry(1.2, 0.08, 25.0);
+    const continuousSoffit = new THREE.Mesh(continuousSoffitGeo, woodPanelMat);
+    continuousSoffit.position.set(isLeft ? wallX + 0.6 : wallX - 0.6, 3.62, 1.0);
+    continuousSoffit.receiveShadow = true;
+    parent.add(continuousSoffit);
+
     for (const zBalcony of [-3.5, 2.5, 8.0]) {
-      // Main curved pod overhang
+      // Bodi balkon melengkung putih
       const podGeo = new THREE.BoxGeometry(1.6, 1.1, 4.6);
       const pod = new THREE.Mesh(podGeo, whiteBalconyMat);
       pod.position.set(isLeft ? wallX + 0.8 : wallX - 0.8, 4.2, zBalcony);
       pod.castShadow = true;
       parent.add(pod);
 
-      // Underside Soffit with warm downlights
-      const soffitGeo = new THREE.BoxGeometry(1.5, 0.08, 4.4);
-      const soffit = new THREE.Mesh(soffitGeo, woodPanelMat);
-      soffit.position.set(isLeft ? wallX + 0.8 : wallX - 0.8, 3.62, zBalcony);
-      parent.add(soffit);
-
-      // Downlights under the balcony soffit
+      // Downlight di bawah balkon
       for (const dlOffset of [-1.5, 0, 1.5]) {
         const blDownlightGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.05, 12);
         const blDownlight = new THREE.Mesh(blDownlightGeo, warmDownlightMat);
@@ -1285,19 +1340,49 @@ function buildAuditoriumEnvironment(parent: THREE.Group | THREE.Scene) {
         parent.add(blDownlight);
       }
 
-      // Dark Balcony Railing on top
+      // Railing balkon gelap di atas
       const railGeo = new THREE.BoxGeometry(0.06, 0.6, 4.5);
       const rail = new THREE.Mesh(railGeo, darkRailingMat);
       rail.position.set(isLeft ? wallX + 1.55 : wallX - 1.55, 5.05, zBalcony);
       parent.add(rail);
     }
 
-    // D. Upper Wood Grid Wainscoting Panel above balcony
-    const upperWoodGeo = new THREE.BoxGeometry(0.1, 2.2, 24);
+    // F. Dinding Panel Grid Kayu Bagian Atas di Atas Balkon
+    const upperWoodGeo = new THREE.BoxGeometry(0.12, 2.5, 25.0);
     const upperWood = new THREE.Mesh(upperWoodGeo, woodPanelMat);
-    upperWood.position.set(wallX, 6.4, 0);
+    upperWood.position.set(wallX, 6.2, 1.0);
     parent.add(upperWood);
   });
+
+  // G. Dinding Penutup Kayu Depan (Panggung) dan Belakang (Pintu Masuk Hall)
+  // Dinding depan samping videotron
+  const frontWoodWallGeo = new THREE.BoxGeometry(23.0, 6.0, 0.15);
+  const frontWoodWall = new THREE.Mesh(frontWoodWallGeo, woodPanelMat);
+  frontWoodWall.position.set(0, 3.0, -11.4);
+  frontWoodWall.receiveShadow = true;
+  parent.add(frontWoodWall);
+
+  // Tirai panggung beludru gelap di kiri dan kanan panggung (Sesuai Foto 1)
+  const drapeMat = new THREE.MeshStandardMaterial({
+    color: "#0F172A",
+    roughness: 0.95,
+  });
+  const drapeLeftGeo = new THREE.BoxGeometry(3.6, 5.2, 0.2);
+  const drapeLeft = new THREE.Mesh(drapeLeftGeo, drapeMat);
+  drapeLeft.position.set(-9.4, 2.8, -11.2);
+  parent.add(drapeLeft);
+
+  const drapeRightGeo = new THREE.BoxGeometry(3.6, 5.2, 0.2);
+  const drapeRight = new THREE.Mesh(drapeRightGeo, drapeMat);
+  drapeRight.position.set(9.4, 2.8, -11.2);
+  parent.add(drapeRight);
+
+  // Dinding kayu belakang hall
+  const rearWoodWallGeo = new THREE.BoxGeometry(23.0, 4.5, 0.15);
+  const rearWoodWall = new THREE.Mesh(rearWoodWallGeo, woodPanelMat);
+  rearWoodWall.position.set(0, 2.25, 13.4);
+  rearWoodWall.receiveShadow = true;
+  parent.add(rearWoodWall);
 
   // 5. VAULTED SLOPED TIMBER CEILING RAFTERS (Atap Balok Kayu Sloped)
   const ceilingRafterMat = new THREE.MeshStandardMaterial({
