@@ -1611,27 +1611,6 @@ function buildAuditoriumEnvironment(parent: THREE.Group | THREE.Scene) {
     spkBox.position.set(spkX, 2.0, -4.5);
     parent.add(spkBox);
   }
-
-  // 8. MASTER CONTROL / FOH BOOTH & AUDIO DESK (Mezzanine Belakang Sesuai Video)
-  const fohGeo = new THREE.BoxGeometry(7.0, 1.4, 2.4);
-  const fohMat = new THREE.MeshStandardMaterial({
-    color: "#FFFFFF",
-    roughness: 0.6,
-  });
-  const foh = new THREE.Mesh(fohGeo, fohMat);
-  foh.position.set(0, 0.7, 10.0);
-  foh.castShadow = true;
-  foh.receiveShadow = true;
-  parent.add(foh);
-
-  // FOH Screen Monitors
-  for (const monX of [-2.0, 0, 2.0]) {
-    const monGeo = new THREE.BoxGeometry(0.7, 0.45, 0.08);
-    const monMat = new THREE.MeshBasicMaterial({ color: "#00A2E9" });
-    const mon = new THREE.Mesh(monGeo, monMat);
-    mon.position.set(monX, 1.65, 9.8);
-    parent.add(mon);
-  }
 }
 
 function createCCTVMarker(cctv: CCTVUnit, isSelected: boolean): THREE.Group {
