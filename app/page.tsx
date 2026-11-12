@@ -11,9 +11,13 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarInset,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -21,16 +25,25 @@ import {
   Calendar,
   Zap,
   ChevronRight,
+  ChevronDown,
   Search,
   Share2,
   Languages,
   Activity,
   Bell,
+  LayoutDashboard,
+  CalendarDays,
+  Trophy,
+  Users,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { CCTVActivationView } from "@/components/cctv/cctv-activation-view";
+import { EventView, EventSubmenuTab } from "@/components/event/event-view";
 
 export default function DashboardShell7Page() {
-  const [activeTab, setActiveTab] = React.useState<"dashboard" | "event" | "aktivasi">("aktivasi");
+  const [activeTab, setActiveTab] = React.useState<"dashboard" | "event" | "aktivasi">("event");
+  const [eventSubTab, setEventSubTab] = React.useState<EventSubmenuTab>("dashboard");
+  const [isEventSubmenuOpen, setIsEventSubmenuOpen] = React.useState(true);
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -90,21 +103,120 @@ export default function DashboardShell7Page() {
                   <span>Dashboard</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeTab === "event"}
-                  tooltip="Event"
-                  onClick={() => setActiveTab("event")}
-                  className={
-                    activeTab === "event"
-                      ? "bg-zinc-100/90 text-zinc-900 font-medium hover:bg-zinc-100"
-                      : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
-                  }
-                >
-                  <Calendar className="size-4 text-zinc-500" />
-                  <span>Event</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              <Collapsible
+                open={isEventSubmenuOpen}
+                onOpenChange={setIsEventSubmenuOpen}
+                className="group/collapsible"
+              >
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={activeTab === "event"}
+                    tooltip="Event"
+                    onClick={() => {
+                      setActiveTab("event");
+                      setIsEventSubmenuOpen(true);
+                    }}
+                    className={
+                      activeTab === "event"
+                        ? "bg-zinc-100/90 text-zinc-900 font-medium hover:bg-zinc-100"
+                        : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
+                    }
+                  >
+                    <Calendar className="size-4 text-zinc-700" />
+                    <span>Event</span>
+                    <ChevronDown
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsEventSubmenuOpen(!isEventSubmenuOpen);
+                      }}
+                      className={cn(
+                        "ml-auto size-3.5 text-zinc-400 transition-transform duration-200 group-data-[collapsible=icon]:hidden cursor-pointer",
+                        isEventSubmenuOpen && "rotate-180"
+                      )}
+                    />
+                  </SidebarMenuButton>
+
+                  <CollapsibleContent>
+                    <SidebarMenuSub className="py-1">
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton
+                          isActive={activeTab === "event" && eventSubTab === "dashboard"}
+                          onClick={() => {
+                            setActiveTab("event");
+                            setEventSubTab("dashboard");
+                          }}
+                          className={cn(
+                            "cursor-pointer text-xs font-normal py-1.5",
+                            activeTab === "event" && eventSubTab === "dashboard"
+                              ? "bg-[#00A2E9]/10 text-[#003B5C] font-semibold"
+                              : "text-zinc-600 hover:text-zinc-900"
+                          )}
+                        >
+                          <LayoutDashboard className="size-3.5 text-zinc-500" />
+                          <span>Dashboard</span>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton
+                          isActive={activeTab === "event" && eventSubTab === "upcoming"}
+                          onClick={() => {
+                            setActiveTab("event");
+                            setEventSubTab("upcoming");
+                          }}
+                          className={cn(
+                            "cursor-pointer text-xs font-normal py-1.5",
+                            activeTab === "event" && eventSubTab === "upcoming"
+                              ? "bg-[#00A2E9]/10 text-[#003B5C] font-semibold"
+                              : "text-zinc-600 hover:text-zinc-900"
+                          )}
+                        >
+                          <CalendarDays className="size-3.5 text-zinc-500" />
+                          <span>Jadwal Shift</span>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton
+                          isActive={activeTab === "event" && eventSubTab === "assigned"}
+                          onClick={() => {
+                            setActiveTab("event");
+                            setEventSubTab("assigned");
+                          }}
+                          className={cn(
+                            "cursor-pointer text-xs font-normal py-1.5",
+                            activeTab === "event" && eventSubTab === "assigned"
+                              ? "bg-[#00A2E9]/10 text-[#003B5C] font-semibold"
+                              : "text-zinc-600 hover:text-zinc-900"
+                          )}
+                        >
+                          <Trophy className="size-3.5 text-zinc-500" />
+                          <span>Peringkat & Antrean</span>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton
+                          isActive={activeTab === "event" && eventSubTab === "team"}
+                          onClick={() => {
+                            setActiveTab("event");
+                            setEventSubTab("team");
+                          }}
+                          className={cn(
+                            "cursor-pointer text-xs font-normal py-1.5",
+                            activeTab === "event" && eventSubTab === "team"
+                              ? "bg-[#00A2E9]/10 text-[#003B5C] font-semibold"
+                              : "text-zinc-600 hover:text-zinc-900"
+                          )}
+                        >
+                          <Users className="size-3.5 text-zinc-500" />
+                          <span>Kelola Tim</span>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={activeTab === "aktivasi"}
@@ -196,13 +308,19 @@ export default function DashboardShell7Page() {
               </div>
             )}
             {activeTab === "event" && (
-              <div className="py-24 text-center text-zinc-400">
-                <Calendar className="size-10 mx-auto text-zinc-300 mb-3" />
-                <p className="text-base font-semibold text-zinc-700">Manajemen Event</p>
-                <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
-                  Belum ada agenda event yang terjadwal.
-                </p>
-              </div>
+              <React.Suspense
+                fallback={
+                  <div className="py-24 text-center text-zinc-400">
+                    <Calendar className="size-10 mx-auto text-zinc-300 mb-3 animate-pulse" />
+                    <p className="text-base font-semibold text-zinc-700">Memuat Jadwal & Event...</p>
+                  </div>
+                }
+              >
+                <EventView
+                  activeSubTab={eventSubTab}
+                  onSubTabChange={setEventSubTab}
+                />
+              </React.Suspense>
             )}
           </div>
         </div>
