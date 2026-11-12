@@ -5,9 +5,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { CCTVUnit, FacilityLocationId, FACILITY_LOCATIONS } from "@/types/cctv";
 import {
-  RotateCcw,
   Compass,
-  Layers,
   Eye,
   Activity,
   AlertTriangle,
@@ -17,6 +15,11 @@ import {
   Unlock,
   ChevronDown,
   Check,
+  Crosshair,
+  Camera,
+  Keyboard,
+  X,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -70,6 +73,17 @@ export function CCTV3DLocator({
   const [isActivated, setIsActivated] = useState(false);
   const isActivatedRef = useRef(false);
 
+  // Camera POV mode and View Preset state
+  const [isPOVMode, setIsPOVMode] = useState(false);
+  const isPOVModeRef = useRef(false);
+
+  useEffect(() => {
+    isPOVModeRef.current = isPOVMode;
+  }, [isPOVMode]);
+
+  const [viewMode, setViewMode] = useState<"iso" | "front" | "side" | "top" | "pov" | "custom">("iso");
+  const [showBlenderHelp, setShowBlenderHelp] = useState(false);
+
   // Camera animation target
   const animTarget = useRef<{
     camPos: THREE.Vector3;
@@ -83,7 +97,6 @@ export function CCTV3DLocator({
 
   const [autoRotate, setAutoRotate] = useState(false);
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "warning" | "offline">("all");
-  const [isTopDown, setIsTopDown] = useState(false);
 
   // Initialize Three.js Scene
   useEffect(() => {
@@ -120,16 +133,51 @@ export function CCTV3DLocator({
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // 4. Orbit Controls
+    // 4. Orbit Controls with Blender Behavior
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.06;
-    controls.maxPolarAngle = Math.PI / 2 - 0.03; // Don't go below ground
-    controls.minDistance = 4;
-    controls.maxDistance = 50;
-    controls.target.set(0, 1, 0);
+    controls.dampingFactor = 0.08;
+    controls.screenSpacePanning = true; // Essential: allows panning vertically in screen space like Blender!
+    controls.minDistance = 0.2;          // Allows extreme close-up inspection of cameras, brackets, downlights
+    controls.maxDistance = 150;
+    controls.maxPolarAngle = Math.PI - 0.02; // Full vertical freedom to look up under ceiling, soffits & trusses
+    controls.minPolarAngle = 0.01;           // Can look straight down from top
+    controls.zoomSpeed = 1.2;
+    controls.panSpeed = 1.2;
+    controls.rotateSpeed = 0.8;
+
+    // Blender mouse button mapping:
+    // Left: Rotate (Orbit) - Shift+Left: Pan
+    // Middle: Rotate (Orbit) - Shift+Middle: Pan (Pure Blender MMB!)
+    // Right: Pan (Quick right drag pan)
+    controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.ROTATE,
+      RIGHT: THREE.MOUSE.PAN,
+    };
+
+    // Auto cancel camera fly-to and smoothly exit POV on manual orbit drag
+    controls.addEventListener("start", () => {
+      animTarget.current.isAnimating = false;
+      if (isPOVModeRef.current) {
+        setIsPOVMode(false);
+        setViewMode("custom");
+        if (cameraRef.current) {
+          cameraRef.current.fov = 45;
+          cameraRef.current.updateProjectionMatrix();
+        }
+      }
+    });
+
+    controls.target.set(0, selectedLocationId === "auditorium-pln" ? 1.2 : 1, 0);
     controls.enabled = isActivatedRef.current;
     controlsRef.current = controls;
+
+    // Prevent browser context menu on right click so RMB Pan is seamless
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    renderer.domElement.addEventListener("contextmenu", handleContextMenu);
 
     // 5. Lighting
     const ambientLight = new THREE.AmbientLight("#FFFFFF", 1.2);
@@ -236,6 +284,7 @@ export function CCTV3DLocator({
       cancelAnimationFrame(animationFrameId);
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener("click", handleClick);
+      renderer.domElement.removeEventListener("contextmenu", handleContextMenu);
       controls.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
@@ -312,41 +361,183 @@ export function CCTV3DLocator({
     if (!selectedUnit) return;
 
     const [x, y, z] = selectedUnit.position3D;
-    const targetPos = new THREE.Vector3(x, y, z);
 
-    // Compute camera offset along look angle
-    const camOffset = new THREE.Vector3(3.5, 3.0, 3.5);
-    const camPos = targetPos.clone().add(camOffset);
+    if (isPOVModeRef.current) {
+      // In POV mode, animate camera directly to CCTV position looking at target
+      const [tx, ty, tz] = selectedUnit.target3D;
+      animTarget.current = {
+        camPos: new THREE.Vector3(x, y, z),
+        targetPos: new THREE.Vector3(tx, ty, tz),
+        isAnimating: true,
+      };
+      cameraRef.current.fov = selectedUnit.fovAngle || 50;
+      cameraRef.current.updateProjectionMatrix();
+    } else {
+      const targetPos = new THREE.Vector3(x, y, z);
+      // Frame camera ~2.5m away facing the unit for close inspection
+      const camOffset = new THREE.Vector3(
+        x >= 0 ? -2.2 : 2.2,
+        -0.3,
+        z < -5 ? 2.8 : -2.8
+      );
+      const camPos = targetPos.clone().add(camOffset);
 
-    animTarget.current = {
-      camPos,
-      targetPos,
-      isAnimating: true,
-    };
+      animTarget.current = {
+        camPos,
+        targetPos,
+        isAnimating: true,
+      };
+    }
   }, [selectedCCTVId, cctvList]);
 
-  // Controls Handlers
+  // Controls Handlers with Blender-like View Presets
   const handleResetCamera = useCallback(() => {
-    setIsTopDown(false);
+    setIsPOVMode(false);
+    if (cameraRef.current) {
+      cameraRef.current.fov = 45;
+      cameraRef.current.updateProjectionMatrix();
+    }
+    setViewMode("iso");
+    if (selectedLocationId === "auditorium-pln") {
+      animTarget.current = {
+        camPos: new THREE.Vector3(12, 14, 18),
+        targetPos: new THREE.Vector3(0, 1.2, 0),
+        isAnimating: true,
+      };
+    } else {
+      animTarget.current = {
+        camPos: new THREE.Vector3(14, 16, 20),
+        targetPos: new THREE.Vector3(0, 1, 0),
+        isAnimating: true,
+      };
+    }
+  }, [selectedLocationId]);
+
+  const handleViewFront = useCallback(() => {
+    setIsPOVMode(false);
+    if (cameraRef.current) {
+      cameraRef.current.fov = 45;
+      cameraRef.current.updateProjectionMatrix();
+    }
+    setViewMode("front");
+    if (selectedLocationId === "auditorium-pln") {
+      // Direct front view of the stage & videotron from audience center
+      animTarget.current = {
+        camPos: new THREE.Vector3(0, 3.8, 14.5),
+        targetPos: new THREE.Vector3(0, 3.2, -8.0),
+        isAnimating: true,
+      };
+    } else {
+      animTarget.current = {
+        camPos: new THREE.Vector3(0, 7.0, 18.0),
+        targetPos: new THREE.Vector3(0, 1.5, 0),
+        isAnimating: true,
+      };
+    }
+  }, [selectedLocationId]);
+
+  const handleViewSide = useCallback(() => {
+    setIsPOVMode(false);
+    if (cameraRef.current) {
+      cameraRef.current.fov = 45;
+      cameraRef.current.updateProjectionMatrix();
+    }
+    setViewMode("side");
+    if (selectedLocationId === "auditorium-pln") {
+      // Right side elevation looking across hall & balconies
+      animTarget.current = {
+        camPos: new THREE.Vector3(16.5, 4.2, -2.0),
+        targetPos: new THREE.Vector3(0, 3.0, -2.0),
+        isAnimating: true,
+      };
+    } else {
+      animTarget.current = {
+        camPos: new THREE.Vector3(18.0, 6.0, 0),
+        targetPos: new THREE.Vector3(0, 1.5, 0),
+        isAnimating: true,
+      };
+    }
+  }, [selectedLocationId]);
+
+  const handleViewTop = useCallback(() => {
+    setIsPOVMode(false);
+    if (cameraRef.current) {
+      cameraRef.current.fov = 45;
+      cameraRef.current.updateProjectionMatrix();
+    }
+    setViewMode("top");
     animTarget.current = {
-      camPos: new THREE.Vector3(14, 16, 20),
-      targetPos: new THREE.Vector3(0, 1, 0),
+      camPos: new THREE.Vector3(0, 26, 0.001),
+      targetPos: new THREE.Vector3(0, 0, 0),
       isAnimating: true,
     };
   }, []);
 
-  const handleToggleTopDown = useCallback(() => {
-    if (!isTopDown) {
+  const handleFocusSelected = useCallback(() => {
+    setIsPOVMode(false);
+    if (cameraRef.current) {
+      cameraRef.current.fov = 45;
+      cameraRef.current.updateProjectionMatrix();
+    }
+    setViewMode("custom");
+
+    const unit = cctvList.find((c) => c.id === selectedCCTVId);
+    if (unit) {
+      const [x, y, z] = unit.position3D;
+      const targetPos = new THREE.Vector3(x, y, z);
+      // Frame camera ~2.5m away facing the unit for close inspection
+      const offset = new THREE.Vector3(
+        x >= 0 ? -2.2 : 2.2,
+        -0.3,
+        z < -5 ? 2.8 : -2.8
+      );
+      const camPos = targetPos.clone().add(offset);
       animTarget.current = {
-        camPos: new THREE.Vector3(0, 26, 0.1),
-        targetPos: new THREE.Vector3(0, 0, 0),
+        camPos,
+        targetPos,
         isAnimating: true,
       };
-      setIsTopDown(true);
     } else {
-      handleResetCamera();
+      animTarget.current = {
+        camPos: new THREE.Vector3(10, 12, 14),
+        targetPos: new THREE.Vector3(0, 2.0, 0),
+        isAnimating: true,
+      };
     }
-  }, [isTopDown, handleResetCamera]);
+  }, [selectedCCTVId, cctvList]);
+
+  const handleTogglePOV = useCallback(() => {
+    if (isPOVMode) {
+      // Exit POV mode
+      setIsPOVMode(false);
+      setViewMode("iso");
+      if (cameraRef.current) {
+        cameraRef.current.fov = 45;
+        cameraRef.current.updateProjectionMatrix();
+      }
+      handleFocusSelected();
+    } else {
+      // Enter POV mode
+      let unit = cctvList.find((c) => c.id === selectedCCTVId);
+      if (!unit && cctvList.length > 0) {
+        unit = cctvList[0];
+        onSelectCCTV(unit.id);
+      }
+      if (unit && cameraRef.current && controlsRef.current) {
+        setIsPOVMode(true);
+        setViewMode("pov");
+        const [x, y, z] = unit.position3D;
+        const [tx, ty, tz] = unit.target3D;
+        animTarget.current = {
+          camPos: new THREE.Vector3(x, y, z),
+          targetPos: new THREE.Vector3(tx, ty, tz),
+          isAnimating: true,
+        };
+        cameraRef.current.fov = unit.fovAngle || 50;
+        cameraRef.current.updateProjectionMatrix();
+      }
+    }
+  }, [isPOVMode, selectedCCTVId, cctvList, onSelectCCTV, handleFocusSelected]);
 
   useEffect(() => {
     if (controlsRef.current) {
@@ -363,7 +554,7 @@ export function CCTV3DLocator({
     }
   }, [isActivated]);
 
-  // Click outside and Escape key listeners to unlock cursor / lock map
+  // Click outside to lock map
   useEffect(() => {
     if (!isActivated) return;
 
@@ -376,20 +567,90 @@ export function CCTV3DLocator({
       }
     };
 
+    window.addEventListener("pointerdown", handlePointerDownOutside);
+    return () => window.removeEventListener("pointerdown", handlePointerDownOutside);
+  }, [isActivated]);
+
+  // Keyboard listener for Blender shortcuts & Nudge Pan
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsActivated(false);
+      // Don't intercept when user is typing in forms/inputs
+      const activeTag = (document.activeElement?.tagName || "").toUpperCase();
+      if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT") {
+        return;
+      }
+
+      if (!isActivatedRef.current) return;
+
+      const code = event.code;
+      const key = event.key.toLowerCase();
+
+      // Blender Numpad & number keys:
+      if (code === "Numpad1" || key === "1") {
+        event.preventDefault();
+        handleViewFront();
+      } else if (code === "Numpad3" || key === "3") {
+        event.preventDefault();
+        handleViewSide();
+      } else if (code === "Numpad7" || key === "7") {
+        event.preventDefault();
+        handleViewTop();
+      } else if (code === "Numpad0" || key === "0") {
+        event.preventDefault();
+        handleTogglePOV();
+      } else if (code === "NumpadDecimal" || key === "." || key === "f") {
+        event.preventDefault();
+        handleFocusSelected();
+      } else if (code === "Numpad5" || key === "5" || key === "home") {
+        event.preventDefault();
+        handleResetCamera();
+      } else if (event.key === "Escape") {
+        if (isPOVModeRef.current) {
+          event.preventDefault();
+          handleTogglePOV();
+        } else {
+          setIsActivated(false);
+        }
+      } else if (
+        ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyA", "KeyD", "KeyW", "KeyS"].includes(code)
+      ) {
+        // Nudge pan with WASD or Arrow Keys (Blender walk/nudge navigation)
+        if (controlsRef.current && cameraRef.current) {
+          event.preventDefault();
+          animTarget.current.isAnimating = false;
+          const panStep = event.shiftKey ? 1.0 : 0.35;
+          const forward = new THREE.Vector3();
+          cameraRef.current.getWorldDirection(forward);
+          forward.y = 0;
+          forward.normalize();
+          const right = new THREE.Vector3()
+            .crossVectors(cameraRef.current.up, forward)
+            .normalize()
+            .negate();
+
+          const move = new THREE.Vector3();
+          if (code === "ArrowLeft" || code === "KeyA") move.addScaledVector(right, -panStep);
+          if (code === "ArrowRight" || code === "KeyD") move.addScaledVector(right, panStep);
+          if (code === "ArrowUp" || code === "KeyW") move.addScaledVector(forward, panStep);
+          if (code === "ArrowDown" || code === "KeyS") move.addScaledVector(forward, -panStep);
+
+          cameraRef.current.position.add(move);
+          controlsRef.current.target.add(move);
+          controlsRef.current.update();
+        }
       }
     };
 
-    window.addEventListener("pointerdown", handlePointerDownOutside);
     window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDownOutside);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isActivated]);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    handleViewFront,
+    handleViewSide,
+    handleViewTop,
+    handleTogglePOV,
+    handleFocusSelected,
+    handleResetCamera,
+  ]);
 
   return (
     <div
@@ -521,7 +782,7 @@ export function CCTV3DLocator({
                 <span className="animate-ping absolute inline-flex size-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
               </span>
-              <span className="text-[11px] font-semibold text-sky-100">
+              <span className="text-[11px] font-semibold text-sky-100 hidden sm:inline">
                 Navigasi Aktif
               </span>
               <button
@@ -544,35 +805,243 @@ export function CCTV3DLocator({
             </button>
           )}
 
-          <div className="flex items-center gap-1 bg-white/95 backdrop-blur-md p-1 rounded-lg border border-zinc-200/80 shadow-xs">
+          {/* Blender View Presets (Front, Side, Top, ISO) */}
+          <div className="flex items-center gap-0.5 bg-white/95 backdrop-blur-md p-0.5 rounded-lg border border-zinc-200/80 shadow-xs">
             <button
+              type="button"
+              onClick={handleViewFront}
+              title="Tampak Depan (Blender Numpad 1)"
+              className={cn(
+                "px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer",
+                viewMode === "front"
+                  ? "bg-zinc-900 text-white font-semibold shadow-xs"
+                  : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+              )}
+            >
+              Depan (1)
+            </button>
+            <button
+              type="button"
+              onClick={handleViewSide}
+              title="Tampak Samping (Blender Numpad 3)"
+              className={cn(
+                "px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer",
+                viewMode === "side"
+                  ? "bg-zinc-900 text-white font-semibold shadow-xs"
+                  : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+              )}
+            >
+              Samping (3)
+            </button>
+            <button
+              type="button"
+              onClick={handleViewTop}
+              title="Tampak Atas / Denah (Blender Numpad 7)"
+              className={cn(
+                "px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer",
+                viewMode === "top"
+                  ? "bg-zinc-900 text-white font-semibold shadow-xs"
+                  : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+              )}
+            >
+              Atas (7)
+            </button>
+            <button
+              type="button"
+              onClick={handleResetCamera}
+              title="Perspektif ISO 3D (Blender Numpad 5)"
+              className={cn(
+                "px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer",
+                viewMode === "iso"
+                  ? "bg-zinc-900 text-white font-semibold shadow-xs"
+                  : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+              )}
+            >
+              ISO (5)
+            </button>
+          </div>
+
+          {/* Action Tools: Focus (Frame Selected), POV (Camera View), Help */}
+          <div className="flex items-center gap-1 bg-white/95 backdrop-blur-md p-0.5 rounded-lg border border-zinc-200/80 shadow-xs">
+            <button
+              type="button"
+              onClick={handleFocusSelected}
+              title="Fokus Objek Terpilih (Blender Numpad . / F)"
+              className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition-colors cursor-pointer"
+            >
+              <Crosshair className="size-3.5 text-[#00A2E9]" />
+              <span className="hidden sm:inline">Fokus ( . )</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleTogglePOV}
+              title={
+                isPOVMode
+                  ? "Keluar dari POV Kamera (Numpad 0 / Esc)"
+                  : "Sudut Pandang Lensa Kamera CCTV (Blender Numpad 0)"
+              }
+              className={cn(
+                "flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer",
+                isPOVMode
+                  ? "bg-[#00A2E9] text-white font-semibold shadow-xs"
+                  : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"
+              )}
+            >
+              <Camera className="size-3.5" />
+              <span className="hidden sm:inline">POV (0)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowBlenderHelp(!showBlenderHelp)}
+              title="Bantuan Navigasi Blender (Mouse & Shortcut)"
+              className={cn(
+                "p-1.5 rounded text-xs transition-colors cursor-pointer",
+                showBlenderHelp
+                  ? "bg-sky-100 text-[#00A2E9] font-bold"
+                  : "text-zinc-600 hover:bg-zinc-100"
+              )}
+            >
+              <Keyboard className="size-3.5" />
+            </button>
+
+            <button
+              type="button"
               onClick={() => setAutoRotate(!autoRotate)}
               title="Toggle Auto-Rotate"
               className={`p-1.5 rounded text-xs transition-colors cursor-pointer ${
                 autoRotate ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-100"
               }`}
             >
-              <Compass className="size-4" />
+              <Compass className="size-3.5" />
             </button>
+
             <button
-              onClick={handleToggleTopDown}
-              title={isTopDown ? "Kembali ke Tampilan Perspektif 3D" : "Tampilan Denah Atas (Top-Down)"}
-              className={`p-1.5 rounded text-xs transition-colors cursor-pointer ${
-                isTopDown ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-100"
-              }`}
-            >
-              <Layers className="size-4" />
-            </button>
-            <button
+              type="button"
               onClick={handleResetCamera}
-              title="Reset Sudut Kamera"
+              title="Reset Sudut Pandang Kamera"
               className="p-1.5 rounded text-xs text-zinc-600 hover:bg-zinc-100 transition-colors cursor-pointer"
             >
-              <RotateCcw className="size-4" />
+              <RotateCcw className="size-3.5" />
             </button>
           </div>
         </div>
       </div>
+
+      {/* Active POV Mode HUD Banner */}
+      {isPOVMode && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-zinc-950/90 backdrop-blur-md border border-cyan-400/40 text-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-150 pointer-events-auto">
+          <span className="relative flex size-2">
+            <span className="animate-ping absolute inline-flex size-full rounded-full bg-cyan-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full size-2 bg-cyan-500"></span>
+          </span>
+          <span className="text-[11px] font-medium tracking-tight text-cyan-200">
+            POV Lensa:{" "}
+            <strong className="text-white font-semibold">
+              {cctvList.find((c) => c.id === selectedCCTVId)?.name || "Kamera CCTV"}
+            </strong>{" "}
+            <span className="text-cyan-300 font-mono text-[10px]">
+              ({cctvList.find((c) => c.id === selectedCCTVId)?.sn || ""})
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={handleTogglePOV}
+            className="ml-1 px-2.5 py-0.5 rounded-full bg-white/20 hover:bg-white/30 text-[10px] font-semibold text-white transition-colors cursor-pointer"
+          >
+            Keluar POV (0 / Esc)
+          </button>
+        </div>
+      )}
+
+      {/* Blender Navigation Help Modal */}
+      {showBlenderHelp && (
+        <div className="absolute top-14 right-3 z-40 w-80 rounded-2xl border border-zinc-200 bg-white/98 backdrop-blur-md p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150 pointer-events-auto text-zinc-900">
+          <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-zinc-100">
+            <div className="flex items-center gap-2">
+              <span className="flex size-6 items-center justify-center rounded-lg bg-sky-50 text-[#00A2E9] border border-sky-100">
+                <Keyboard className="size-3.5" />
+              </span>
+              <span className="text-xs font-bold text-zinc-900">
+                Navigasi Kamera Blender
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowBlenderHelp(false)}
+              className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+
+          <div className="space-y-2 text-[11px]">
+            <div className="flex items-start gap-2.5">
+              <span className="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] font-semibold shrink-0">
+                MMB / Drag Kiri
+              </span>
+              <span className="text-zinc-600">
+                <strong className="text-zinc-800">Putar (Orbit 3D)</strong>: Putar bebas ke seluruh sudut termasuk mendongak ke plafon & soffit.
+              </span>
+            </div>
+
+            <div className="flex items-start gap-2.5">
+              <span className="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] font-semibold shrink-0">
+                Shift + Drag / RMB
+              </span>
+              <span className="text-zinc-600">
+                <strong className="text-zinc-800">Geser (Pan Layar)</strong>: Geser posisi kamera secara vertikal & horizontal.
+              </span>
+            </div>
+
+            <div className="flex items-start gap-2.5">
+              <span className="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] font-semibold shrink-0">
+                Scroll Wheel
+              </span>
+              <span className="text-zinc-600">
+                <strong className="text-zinc-800">Zoom Dekat/Jauh</strong>: Perbesar hingga jarak 20cm untuk inspeksi detail bracket & lensa.
+              </span>
+            </div>
+
+            <div className="flex items-start gap-2.5">
+              <span className="px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 text-[#00A2E9] font-mono text-[10px] font-semibold shrink-0">
+                . / F
+              </span>
+              <span className="text-zinc-600">
+                <strong className="text-zinc-800">Fokus Objek</strong>: Pusatkan orbit putar tepat pada unit CCTV yang sedang dipilih.
+              </span>
+            </div>
+
+            <div className="flex items-start gap-2.5">
+              <span className="px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 text-[#00A2E9] font-mono text-[10px] font-semibold shrink-0">
+                0 (Numpad 0)
+              </span>
+              <span className="text-zinc-600">
+                <strong className="text-zinc-800">POV Kamera</strong>: Masuk ke sudut pandang langsung lensa CCTV yang aktif.
+              </span>
+            </div>
+
+            <div className="flex items-start gap-2.5">
+              <span className="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] font-semibold shrink-0">
+                1 / 3 / 7 / 5
+              </span>
+              <span className="text-zinc-600">
+                <strong className="text-zinc-800">Preset View</strong>: Tampak Depan (1), Samping (3), Atas (7), ISO (5).
+              </span>
+            </div>
+
+            <div className="flex items-start gap-2.5">
+              <span className="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] font-semibold shrink-0">
+                WASD / Panah
+              </span>
+              <span className="text-zinc-600">
+                <strong className="text-zinc-800">Jalan / Nudge</strong>: Geser posisi kamera langkah demi langkah (Shift = lebih cepat).
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 3D WebGL Canvas Mount Container */}
       <div
@@ -645,6 +1114,27 @@ export function CCTV3DLocator({
             <span className="text-xs text-zinc-400">
               Klik salah satu pin CCTV 3D di peta atau baris tabel di bawah untuk fokus lokasi.
             </span>
+          </div>
+        )}
+
+        {/* Navigation Hint Pill when active */}
+        {isActivated && (
+          <div className="hidden md:flex items-center gap-2 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-lg border border-zinc-200/80 shadow-xs text-[10px] text-zinc-500 pointer-events-auto">
+            <span>🖱️ MMB: Putar</span>
+            <span className="text-zinc-300">•</span>
+            <span>Shift+Drag / RMB: Geser</span>
+            <span className="text-zinc-300">•</span>
+            <span>Scroll: Zoom</span>
+            <span className="text-zinc-300">•</span>
+            <span>WASD: Jalan</span>
+            <span className="text-zinc-300">•</span>
+            <button
+              type="button"
+              onClick={() => setShowBlenderHelp(true)}
+              className="text-[#00A2E9] font-semibold hover:underline cursor-pointer"
+            >
+              Shortcut Blender (1/3/7/0/.)
+            </button>
           </div>
         )}
 
