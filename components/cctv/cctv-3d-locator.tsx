@@ -408,7 +408,6 @@ export function CCTV3DLocator({
               className="flex items-center gap-2 px-2 py-1 -my-0.5 rounded-md hover:bg-zinc-100 transition-colors cursor-pointer select-none group/loc"
               title="Ganti Lokasi Fasilitas Digital Twin"
             >
-              <span className={cn("size-2 rounded-full animate-pulse", currentLocation.dotColor)} />
               <span className="text-xs font-semibold text-zinc-900 tracking-tight">
                 {currentLocation.name}
               </span>
@@ -443,16 +442,13 @@ export function CCTV3DLocator({
                           : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"
                       )}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className={cn("size-2 rounded-full shrink-0", loc.dotColor)} />
-                        <div className="flex flex-col min-w-0">
-                          <span className="truncate leading-tight font-medium text-zinc-900">
-                            {loc.name}
-                          </span>
-                          <span className="text-[10px] text-zinc-400 truncate leading-tight mt-0.5">
-                            {loc.subtitle}
-                          </span>
-                        </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="truncate leading-tight font-medium text-zinc-900">
+                          {loc.name}
+                        </span>
+                        <span className="text-[10px] text-zinc-400 truncate leading-tight mt-0.5">
+                          {loc.subtitle}
+                        </span>
                       </div>
                       {isSelected && (
                         <Check className="size-4 text-zinc-900 shrink-0 ml-1" />
