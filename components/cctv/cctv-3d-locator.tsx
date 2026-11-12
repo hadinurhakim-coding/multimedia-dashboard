@@ -397,11 +397,16 @@ export function CCTV3DLocator({
       className="relative w-full max-w-full min-w-0 h-[400px] lg:h-[460px] rounded-xl border border-zinc-200/80 bg-white overflow-hidden shadow-xs flex flex-col"
     >
       {/* 3D Top Floating Toolbar */}
-      <div className="absolute top-3 inset-x-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+      <div className="absolute top-3 inset-x-3 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
         {/* Left: Facility Badge & Status Filter */}
-        <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-200/80 shadow-xs pointer-events-auto">
+        <div
+          className={cn(
+            "relative flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-200/80 shadow-xs pointer-events-auto transition-all",
+            isLocationMenuOpen ? "z-50" : "z-20"
+          )}
+        >
           {/* Location Dropdown Trigger & Options Popover */}
-          <div className="relative pr-3 border-r border-zinc-200" ref={locationMenuRef}>
+          <div className="relative pr-3 border-r border-zinc-200 z-50" ref={locationMenuRef}>
             <button
               type="button"
               onClick={() => setIsLocationMenuOpen(!isLocationMenuOpen)}
@@ -421,7 +426,7 @@ export function CCTV3DLocator({
 
             {/* Dropdown Options Popover matching the user's video UX */}
             {isLocationMenuOpen && (
-              <div className="absolute top-full left-0 mt-2 z-50 w-64 rounded-xl border border-zinc-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute top-full left-0 mt-2 z-50 w-64 rounded-xl border border-zinc-200 bg-white p-1.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
                 <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                   Pilih Lokasi Fasilitas
                 </div>
@@ -509,7 +514,7 @@ export function CCTV3DLocator({
         </div>
 
         {/* Right: Camera Action Controls & Lock/Unlock Toggle */}
-        <div className="flex items-center gap-1.5 pointer-events-auto">
+        <div className="relative z-10 flex items-center gap-1.5 pointer-events-auto">
           {isActivated ? (
             <div className="flex items-center gap-1.5 bg-[#003B5C] text-white px-2.5 py-1 rounded-lg border border-sky-400/30 shadow-xs animate-in fade-in zoom-in-95 duration-150">
               <span className="relative flex size-2">
