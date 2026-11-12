@@ -992,33 +992,237 @@ function createCCTVMarker(cctv: CCTVUnit, isSelected: boolean): THREE.Group {
   if (cctv.status === "warning") statusHex = "#FFD100"; // Yellow
   if (cctv.status === "offline") statusHex = "#ED1C24"; // Red
 
-  // 1. Camera Mount Bracket Pole
-  const poleGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.6, 8);
-  const poleMat = new THREE.MeshStandardMaterial({ color: "#475569" });
-  const pole = new THREE.Mesh(poleGeo, poleMat);
-  pole.position.set(0, -0.3, 0);
-  group.add(pole);
-
-  // 2. Camera Head Body (White Capsule)
-  const headGeo = new THREE.SphereGeometry(0.24, 16, 16);
-  const headMat = new THREE.MeshStandardMaterial({
-    color: "#FFFFFF",
-    roughness: 0.3,
-    metalness: 0.3,
-  });
-  const head = new THREE.Mesh(headGeo, headMat);
-  head.castShadow = true;
-  group.add(head);
-
-  // 3. Status Ring Glow
-  const ringGeo = new THREE.TorusGeometry(0.26, 0.04, 8, 24);
-  const ringMat = new THREE.MeshBasicMaterial({ color: statusHex });
-  const ring = new THREE.Mesh(ringGeo, ringMat);
-  ring.rotation.x = Math.PI / 2;
-  group.add(ring);
-
-  // 4. Direction Cone / Vision Frustum
+  // Direction vector towards target
   const dir = new THREE.Vector3(tx - x, ty - y, tz - z);
+
+  // Create an oriented assembly for the industrial bullet camera & mounting bracket
+  const cameraAssembly = new THREE.Group();
+
+  // 1. Materials with industrial PBR properties
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: "#FFFFFF",
+    roughness: 0.35,
+    metalness: 0.12,
+  });
+
+  const hoodMat = new THREE.MeshStandardMaterial({
+    color: "#F8FAFC",
+    roughness: 0.3,
+    metalness: 0.08,
+  });
+
+  const bracketMat = new THREE.MeshStandardMaterial({
+    color: "#E2E8F0",
+    roughness: 0.45,
+    metalness: 0.25,
+  });
+
+  const boltMat = new THREE.MeshStandardMaterial({
+    color: "#94A3B8",
+    roughness: 0.2,
+    metalness: 0.85,
+  });
+
+  const bezelMat = new THREE.MeshStandardMaterial({
+    color: "#0F172A", // Deep charcoal dark bezel
+    roughness: 0.55,
+    metalness: 0.2,
+  });
+
+  const barrelMat = new THREE.MeshStandardMaterial({
+    color: "#1E293B",
+    roughness: 0.25,
+    metalness: 0.7,
+  });
+
+  const glassLensMat = new THREE.MeshStandardMaterial({
+    color: "#020617",
+    roughness: 0.05,
+    metalness: 0.95,
+  });
+
+  const cableMat = new THREE.MeshStandardMaterial({
+    color: "#18181B",
+    roughness: 0.85,
+    metalness: 0.05,
+  });
+
+  const statusLedMat = new THREE.MeshBasicMaterial({ color: statusHex });
+
+  // 2. WALL MOUNTING BRACKET (Plat Dinding + Lengan Cantilever + 4 Baut)
+  // Base Plate (Plat persegi panjang di dudukan belakang)
+  const basePlateGeo = new THREE.BoxGeometry(0.32, 0.44, 0.04);
+  const basePlate = new THREE.Mesh(basePlateGeo, bracketMat);
+  basePlate.position.set(0, 0, -0.42);
+  cameraAssembly.add(basePlate);
+
+  // 4 Corner Screws / Bolts
+  const boltPositions: [number, number][] = [
+    [-0.11, 0.16],
+    [0.11, 0.16],
+    [-0.11, -0.16],
+    [0.11, -0.16],
+  ];
+  const boltGeo = new THREE.CylinderGeometry(0.026, 0.026, 0.025, 8);
+  boltGeo.rotateX(Math.PI / 2);
+  boltPositions.forEach(([bx, by]) => {
+    const bolt = new THREE.Mesh(boltGeo, boltMat);
+    bolt.position.set(bx, by, -0.395);
+    cameraAssembly.add(bolt);
+  });
+
+  // Cantilever Arm (Lengan horizontal memanjang ke depan)
+  const armGeo = new THREE.BoxGeometry(0.08, 0.06, 0.36);
+  const arm = new THREE.Mesh(armGeo, bracketMat);
+  arm.position.set(0, -0.06, -0.24);
+  cameraAssembly.add(arm);
+
+  // Triangular Gusset Brace (Web penyangga miring di bawah lengan seperti di foto referensi)
+  const gussetGeo = new THREE.BoxGeometry(0.04, 0.20, 0.24);
+  const gusset = new THREE.Mesh(gussetGeo, bracketMat);
+  gusset.position.set(0, -0.14, -0.30);
+  gusset.rotation.x = -Math.PI / 6; // ~30 deg slant
+  cameraAssembly.add(gusset);
+
+  // Pivot Swivel Joint Knuckle (Engsel silinder vertikal penyambung bodi kamera)
+  const knuckleGeo = new THREE.CylinderGeometry(0.055, 0.055, 0.10, 16);
+  const knuckle = new THREE.Mesh(knuckleGeo, bracketMat);
+  knuckle.position.set(0, -0.04, -0.06);
+  cameraAssembly.add(knuckle);
+
+  // 3. CAMERA MAIN BODY (Bodi Kamera Utama)
+  // Main Housing Box
+  const bodyGeo = new THREE.BoxGeometry(0.30, 0.26, 0.60);
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.set(0, 0.09, 0.02);
+  body.castShadow = true;
+  cameraAssembly.add(body);
+
+  // Bottom Mounting Hinge Lug (Penyambung bawah bodi ke knuckle)
+  const lugGeo = new THREE.BoxGeometry(0.10, 0.06, 0.14);
+  const lug = new THREE.Mesh(lugGeo, bracketMat);
+  lug.position.set(0, -0.05, -0.06);
+  cameraAssembly.add(lug);
+
+  // Rear Housing Cap
+  const rearCapGeo = new THREE.BoxGeometry(0.28, 0.24, 0.04);
+  const rearCap = new THREE.Mesh(rearCapGeo, bracketMat);
+  rearCap.position.set(0, 0.09, -0.29);
+  cameraAssembly.add(rearCap);
+
+  // 4. SUNSHIELD / VISOR HOOD (Tudung Pelindung Matahari & Hujan)
+  // Main Top Roof Plate
+  const hoodRoofGeo = new THREE.BoxGeometry(0.34, 0.025, 0.74);
+  const hoodRoof = new THREE.Mesh(hoodRoofGeo, hoodMat);
+  hoodRoof.position.set(0, 0.235, 0.05);
+  cameraAssembly.add(hoodRoof);
+
+  // Top Center Ridgeline Spine (Punggung tengah bodi atas seperti wireframe foto 3)
+  const hoodRidgeGeo = new THREE.BoxGeometry(0.22, 0.02, 0.70);
+  const hoodRidge = new THREE.Mesh(hoodRidgeGeo, hoodMat);
+  hoodRidge.position.set(0, 0.255, 0.05);
+  cameraAssembly.add(hoodRidge);
+
+  // Angled Front Visor Snout (Tudung depan yang menjorok miring ke bawah menaungi lensa)
+  const visorSnoutGeo = new THREE.BoxGeometry(0.34, 0.025, 0.16);
+  const visorSnout = new THREE.Mesh(visorSnoutGeo, hoodMat);
+  visorSnout.position.set(0, 0.195, 0.44);
+  visorSnout.rotation.x = Math.PI / 6; // 30 deg downward tilt
+  cameraAssembly.add(visorSnout);
+
+  // Left & Right Hood Side Skirts (Bibir samping pelindung)
+  const skirtGeo = new THREE.BoxGeometry(0.02, 0.14, 0.70);
+  const leftSkirt = new THREE.Mesh(skirtGeo, hoodMat);
+  leftSkirt.position.set(-0.16, 0.165, 0.05);
+  cameraAssembly.add(leftSkirt);
+
+  const rightSkirt = new THREE.Mesh(skirtGeo, hoodMat);
+  rightSkirt.position.set(0.16, 0.165, 0.05);
+  cameraAssembly.add(rightSkirt);
+
+  // 5. FRONT FACEPLATE & OPTICAL LENS ASSEMBLY
+  // Dark Front Faceplate (Bezel hitam persegi)
+  const bezelGeo = new THREE.BoxGeometry(0.28, 0.24, 0.03);
+  const bezel = new THREE.Mesh(bezelGeo, bezelMat);
+  bezel.position.set(0, 0.09, 0.325);
+  cameraAssembly.add(bezel);
+
+  // Outer Aluminum Lens Barrel (Lingkaran luar laras lensa)
+  const barrelGeo = new THREE.CylinderGeometry(0.095, 0.095, 0.035, 32);
+  barrelGeo.rotateX(Math.PI / 2);
+  const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+  barrel.position.set(0, 0.09, 0.345);
+  cameraAssembly.add(barrel);
+
+  // Stepped Inner Aperture Ring (Cincin aperture bertingkat seperti di foto 2)
+  const stepRingGeo = new THREE.CylinderGeometry(0.078, 0.078, 0.04, 32);
+  stepRingGeo.rotateX(Math.PI / 2);
+  const stepRing = new THREE.Mesh(stepRingGeo, bezelMat);
+  stepRing.position.set(0, 0.09, 0.355);
+  cameraAssembly.add(stepRing);
+
+  // Glass Lens Optic (Kaca lensa hitam mengkilap)
+  const lensGeo = new THREE.CylinderGeometry(0.060, 0.060, 0.042, 32);
+  lensGeo.rotateX(Math.PI / 2);
+  const lens = new THREE.Mesh(lensGeo, glassLensMat);
+  lens.position.set(0, 0.09, 0.362);
+  cameraAssembly.add(lens);
+
+  // Lens Core Pupil Reflection (Pantulan optik biru/cyan)
+  const pupilGeo = new THREE.SphereGeometry(0.030, 16, 16);
+  const pupilMat = new THREE.MeshBasicMaterial({
+    color: statusHex,
+    transparent: true,
+    opacity: 0.75,
+  });
+  const pupil = new THREE.Mesh(pupilGeo, pupilMat);
+  pupil.position.set(0, 0.09, 0.370);
+  cameraAssembly.add(pupil);
+
+  // Front Status LED Indicator (Lampu LED indikator di sudut kanan atas bezel)
+  const ledGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.02, 12);
+  ledGeo.rotateX(Math.PI / 2);
+  const led = new THREE.Mesh(ledGeo, statusLedMat);
+  led.position.set(0.09, 0.16, 0.345);
+  cameraAssembly.add(led);
+
+  // 6. FLEXIBLE CABLING (Dua kabel melengkung fleksibel dari bodi ke plat dinding)
+  // Cable 1: Upper Loop (melengkung dari belakang bodi ke plat dinding)
+  const upperCableCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.06, 0.04, -0.28),
+    new THREE.Vector3(0.12, 0.12, -0.34),
+    new THREE.Vector3(0.08, -0.04, -0.40),
+    new THREE.Vector3(0.05, -0.10, -0.41),
+  ]);
+  const upperCableGeo = new THREE.TubeGeometry(upperCableCurve, 20, 0.02, 8, false);
+  const upperCable = new THREE.Mesh(upperCableGeo, cableMat);
+  cameraAssembly.add(upperCable);
+
+  // Cable 2: Lower Loop (melengkung dari bawah bodi ke plat dinding)
+  const lowerCableCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-0.05, -0.04, -0.22),
+    new THREE.Vector3(-0.11, -0.16, -0.30),
+    new THREE.Vector3(-0.08, -0.20, -0.38),
+    new THREE.Vector3(-0.04, -0.14, -0.41),
+  ]);
+  const lowerCableGeo = new THREE.TubeGeometry(lowerCableCurve, 20, 0.02, 8, false);
+  const lowerCable = new THREE.Mesh(lowerCableGeo, cableMat);
+  cameraAssembly.add(lowerCable);
+
+  // 7. INVISIBLE CLICK HITBOX (Memudahkan klik dan pemilihan kamera dari jarak jauh)
+  const hitGeo = new THREE.BoxGeometry(0.8, 0.8, 1.0);
+  const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+  const hitBox = new THREE.Mesh(hitGeo, hitMat);
+  hitBox.position.set(0, 0.09, 0.05);
+  cameraAssembly.add(hitBox);
+
+  // 8. ORIENT CAMERA ASSEMBLY TOWARDS TARGET
+  // The camera front face (+Z) points directly at the target direction
+  cameraAssembly.lookAt(dir);
+  cameraAssembly.scale.set(1.4, 1.4, 1.4);
+  group.add(cameraAssembly);
+
+  // 9. DIRECTION CONE / VISION FRUSTUM (Jangkauan Bidang Pandang Kamera)
   const dist = Math.min(dir.length(), 6.5);
   const coneGeo = new THREE.ConeGeometry(dist * 0.45, dist, 16, 1, true);
   coneGeo.translate(0, -dist / 2, 0);
@@ -1034,26 +1238,36 @@ function createCCTVMarker(cctv: CCTVUnit, isSelected: boolean): THREE.Group {
   });
 
   const cone = new THREE.Mesh(coneGeo, coneMat);
+  cone.position.set(0, 0, 0);
   cone.lookAt(dir);
   group.add(cone);
 
-  // 5. Selected Pulse Halo Highlight
+  // 10. STATUS & SELECTION HIGHLIGHTS
+  // Glowing Status Torus Ring under the camera
+  const statusRingGeo = new THREE.TorusGeometry(0.38, 0.03, 8, 32);
+  const statusRingMat = new THREE.MeshBasicMaterial({ color: statusHex });
+  const statusRing = new THREE.Mesh(statusRingGeo, statusRingMat);
+  statusRing.rotation.x = Math.PI / 2;
+  statusRing.position.y = -0.35;
+  group.add(statusRing);
+
+  // Selected State: Concentric Pulse Rings & Overhead Diamond Beacon
   if (isSelected) {
-    const pulseGeo = new THREE.RingGeometry(0.35, 0.55, 32);
+    const pulseGeo = new THREE.RingGeometry(0.45, 0.68, 32);
     const pulseMat = new THREE.MeshBasicMaterial({
       color: "#00A2E9",
       side: THREE.DoubleSide,
     });
     const pulse = new THREE.Mesh(pulseGeo, pulseMat);
     pulse.rotation.x = Math.PI / 2;
-    pulse.position.y = 0.02;
+    pulse.position.y = -0.34;
     group.add(pulse);
 
-    // Floating Target Beacon
-    const beaconGeo = new THREE.OctahedronGeometry(0.18, 0);
+    // Floating Target Beacon above the camera
+    const beaconGeo = new THREE.OctahedronGeometry(0.20, 0);
     const beaconMat = new THREE.MeshBasicMaterial({ color: "#FFD100" });
     const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-    beacon.position.set(0, 0.6, 0);
+    beacon.position.set(0, 0.75, 0);
     group.add(beacon);
   }
 
