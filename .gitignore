@@ -1,6 +1,47 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ==============================================================================
+# PLN ICON PLUS MULTIMEDIA - ENTERPRISE SECURITY .GITIGNORE
+# ==============================================================================
 
-# dependencies
+# 1. Environment Variables & Secret Credentials (HIGHEST PRIORITY)
+.env
+.env.*
+.env*.local
+*.local
+!.env.example
+*.secret
+*.secrets
+*.credential
+*.credentials
+credentials.json
+service-account*.json
+serviceAccountKey*.json
+*token*
+!tokens.css
+
+# 2. SSL / TLS Certificates, SSH & Private Keys
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+id_rsa*
+*.pub
+
+# 3. Database Persistent Volumes & Backups
+/postgres_data/
+/pgdata/
+/data/db/
+*.sql.gz
+*.sql.tar
+*.dump
+*.backup
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+
+# 4. Package Dependencies
 /node_modules
 /.pnp
 .pnp.*
@@ -10,33 +51,46 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-
-# next.js
+# 5. Next.js, Turbopack & Build Outputs
 /.next/
 /out/
-
-# production
 /build
+/dist
+*.tsbuildinfo
+next-env.d.ts
 
-# misc
-.DS_Store
-*.pem
+# 6. Testing & Code Coverage
+/coverage
+*.lcov
 
-# debug
+# 7. Runtime & Debug Logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-!.env.example
-
-# vercel
+# 8. Cloud & Infrastructure Deployments
 .vercel
+.serverless/
+.terraform/
+*.tfstate*
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# 9. Operating System Artifacts
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# 10. IDE & Editor Workspaces
+.idea/
+*.sublime-project
+*.sublime-workspace
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
