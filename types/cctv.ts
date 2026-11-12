@@ -29,7 +29,42 @@ export interface CCTVUnit {
   notes: string;
 }
 
-export const DUMMY_CCTV_DATA: CCTVUnit[] = [
+export type FacilityLocationId = "gi-gandul" | "auditorium-pln";
+
+export interface FacilityLocation {
+  id: FacilityLocationId;
+  name: string;
+  subtitle: string;
+  description: string;
+  facilityType: string;
+  dotColor: string;
+  badge: string;
+}
+
+export const FACILITY_LOCATIONS: FacilityLocation[] = [
+  {
+    id: "gi-gandul",
+    name: "Digital Twin GI Gandul",
+    subtitle: "Gardu Induk 500/150kV Gandul, Depok",
+    description:
+      "Pencatatan inventaris serial number, masa garansi, kontak mitra, dan pemetaan lokasi presisi 3D di Gardu Induk Gandul.",
+    facilityType: "Substation 500kV",
+    dotColor: "bg-emerald-500",
+    badge: "Kelistrikan & Transmisi",
+  },
+  {
+    id: "auditorium-pln",
+    name: "Auditorium PLN Pusat",
+    subtitle: "Kantor Pusat PT PLN (Persero), Jakarta",
+    description:
+      "Pencatatan inventaris kamera broadcast 4K PTZ, video switcher NDI, kontak vendor mitra, dan pemetaan lokasi 3D di Auditorium PLN Pusat.",
+    facilityType: "Broadcasting & Hall",
+    dotColor: "bg-[#00A2E9]",
+    badge: "Broadcasting & Stage",
+  },
+];
+
+export const DUMMY_CCTV_GI_GANDUL: CCTVUnit[] = [
   {
     id: "cctv-01",
     sn: "SN-PLN-CCTV-081",
@@ -199,3 +234,183 @@ export const DUMMY_CCTV_DATA: CCTVUnit[] = [
     notes: "Koneksi fiber optic drop core putus akibat pekerjaan galian eksternal. Perbaikan dijadwalkan.",
   },
 ];
+
+export const DUMMY_CCTV_AUDITORIUM: CCTVUnit[] = [
+  {
+    id: "cctv-aud-01",
+    sn: "SN-PLN-AUD-011",
+    name: "Kamera PTZ 01 — Panggung Utama & Mimbar BOD",
+    model: "Sony BRC-X400 (4K PTZ Broadcast Camera)",
+    type: "Robotic PTZ 4K HDR",
+    purchaseDate: "2024-02-15",
+    activationDate: "2024-03-01",
+    warrantyUntil: "2027-02-28",
+    warrantyStatus: "Valid",
+    location: "Auditorium PLN — Panggung Utama / Stage Front",
+    buildingZone: "Main Stage Area",
+    floor: "Lantai 1 Hall",
+    position3D: [0, 2.8, -4],
+    target3D: [0, 1.2, -7],
+    fovAngle: 50,
+    partnerCompany: "PT Sony Indonesia Broadcasting",
+    partnerPic: "Bambang Wijaya (Lead Broadcast Engineer)",
+    partnerPhone: "+62 811-9988-7711",
+    partnerEmail: "bambang.wijaya@sony-partner.co.id",
+    status: "active",
+    statusLabel: "Normal / Online (4K NDI)",
+    ipAddress: "10.30.15.101",
+    macAddress: "5A:22:BE:1C:77:01",
+    resolution: "3840 x 2160 (4K UHD)",
+    rtspUrl: "rtsp://10.30.15.101:554/live/ch0",
+    notes: "Kamera utama penyiaran mimbar Direksi & RUPS terhubung NDI ke Switcher ATEM.",
+  },
+  {
+    id: "cctv-aud-02",
+    sn: "SN-PLN-AUD-012",
+    name: "Kamera PTZ 02 — Area Audiens & VIP Round Table",
+    model: "Panasonic AW-UE150 (4K 60p PTZ Camera)",
+    type: "Robotic PTZ Wide-Angle",
+    purchaseDate: "2024-04-10",
+    activationDate: "2024-04-25",
+    warrantyUntil: "2027-04-24",
+    warrantyStatus: "Valid",
+    location: "Auditorium PLN — Balkon Samping Kiri",
+    buildingZone: "VIP Audience Seating",
+    floor: "Lantai 1 Hall",
+    position3D: [-5.5, 3.2, 0],
+    target3D: [0, 0.8, 1],
+    fovAngle: 55,
+    partnerCompany: "PT Panasonic Gobel Media",
+    partnerPic: "Siti Rahayu (System Integration Manager)",
+    partnerPhone: "+62 812-4433-2211",
+    partnerEmail: "siti.rahayu@panasonic-partner.co.id",
+    status: "active",
+    statusLabel: "Normal / Online (12G-SDI)",
+    ipAddress: "10.30.15.102",
+    macAddress: "5A:22:BE:1C:77:02",
+    resolution: "3840 x 2160 (4K UHD)",
+    rtspUrl: "rtsp://10.30.15.102:554/live/ch0",
+    notes: "Pengambilan sudut luas interaksi audiens dan dewan komisaris.",
+  },
+  {
+    id: "cctv-aud-03",
+    sn: "SN-PLN-AUD-013",
+    name: "CCTV 03 — Foyer Depan & Registrasi Tamu",
+    model: "Axis M3077-PLVR (360° Panoramic Fisheye)",
+    type: "Fisheye 360° Ceiling Mount",
+    purchaseDate: "2024-05-18",
+    activationDate: "2024-06-02",
+    warrantyUntil: "2027-06-01",
+    warrantyStatus: "Valid",
+    location: "Gedung Utama — Foyer Registrasi & Lobby Barat",
+    buildingZone: "Main Entrance Foyer",
+    floor: "Lantai 1 Foyer",
+    position3D: [0, 3.6, 6.5],
+    target3D: [0, 0.2, 6.5],
+    fovAngle: 75,
+    partnerCompany: "PT Mega Komunikasi Mandiri",
+    partnerPic: "Ahmad Fauzi (Project Manager)",
+    partnerPhone: "+62 813-8877-2211",
+    partnerEmail: "ahmad.fauzi@megakom.co.id",
+    status: "active",
+    statusLabel: "Normal / Online",
+    ipAddress: "10.30.15.103",
+    macAddress: "5A:22:BE:1C:77:03",
+    resolution: "2560 x 1440 (2K QHD)",
+    rtspUrl: "rtsp://10.30.15.103:554/live/ch0",
+    notes: "Monitoring arus kedatangan tamu VVIP, Menteri BUMN, dan jajaran Direksi.",
+  },
+  {
+    id: "cctv-aud-04",
+    sn: "SN-PLN-AUD-014",
+    name: "CCTV 04 — Ruang Master Control & Audio Booth",
+    model: "Dahua IPC-HDBW5442R-ASE (4MP AI Dome)",
+    type: "Dome Indoor AI Low-Light",
+    purchaseDate: "2024-06-11",
+    activationDate: "2024-06-28",
+    warrantyUntil: "2027-06-27",
+    warrantyStatus: "Valid",
+    location: "Auditorium PLN — Control Room Mezzanine",
+    buildingZone: "Audio & Video Control Booth",
+    floor: "Lantai Mezzanine (L2)",
+    position3D: [4.5, 3.2, 4.5],
+    target3D: [2, 1.5, 4.5],
+    fovAngle: 50,
+    partnerCompany: "PT Telkom Infra Solusindo",
+    partnerPic: "Budi Prasetyo (Lead System Engineer)",
+    partnerPhone: "+62 812-9876-5432",
+    partnerEmail: "budi.prasetyo@telkominfra.co.id",
+    status: "warning",
+    statusLabel: "Perlu Kalibrasi Suhu Rack",
+    ipAddress: "10.30.15.104",
+    macAddress: "5A:22:BE:1C:77:04",
+    resolution: "2560 x 1440 (2K QHD)",
+    rtspUrl: "rtsp://10.30.15.104:554/live/ch0",
+    notes: "Sensor integrasi suhu rack server audio mendeteksi suhu hangat 31°C; kalibrasi pendingin aktif.",
+  },
+  {
+    id: "cctv-aud-05",
+    sn: "SN-PLN-AUD-015",
+    name: "Kamera 05 — Backstage & Jalur Masuk VIP",
+    model: "Hikvision DS-2CD2186G2-ISU (8MP AcuSense Dome)",
+    type: "Dome Indoor Vandal-Proof",
+    purchaseDate: "2024-07-22",
+    activationDate: "2024-08-05",
+    warrantyUntil: "2027-08-04",
+    warrantyStatus: "Valid",
+    location: "Auditorium PLN — Ruang Tunggu VIP & Backstage",
+    buildingZone: "VIP Holding Lounge",
+    floor: "Lantai 1 Backstage",
+    position3D: [-4.5, 2.8, -6.5],
+    target3D: [-2.5, 1.0, -5.5],
+    fovAngle: 55,
+    partnerCompany: "PT Schneider Electric Systems",
+    partnerPic: "Dewi Lestari (Field Support Specialist)",
+    partnerPhone: "+62 811-3344-5566",
+    partnerEmail: "dewi.lestari@se-partner.co.id",
+    status: "active",
+    statusLabel: "Normal / Online",
+    ipAddress: "10.30.15.105",
+    macAddress: "5A:22:BE:1C:77:05",
+    resolution: "3840 x 2160 (4K UHD)",
+    rtspUrl: "rtsp://10.30.15.105:554/live/ch0",
+    notes: "Pengamanan koridor VIP holding lounge dan akses pintu masuk panggung belakang.",
+  },
+  {
+    id: "cctv-aud-06",
+    sn: "SN-PLN-AUD-016",
+    name: "Kamera 06 — Overhead Balkon & Lighting Truss",
+    model: "Uniview IPC3234SR3-DVZ28 (4MP Starlight)",
+    type: "Dome High-Angle Ceiling Mount",
+    purchaseDate: "2024-09-05",
+    activationDate: "2024-09-20",
+    warrantyUntil: "2027-09-19",
+    warrantyStatus: "Valid",
+    location: "Auditorium PLN — Truss Lighting Atas Hall",
+    buildingZone: "Ceiling Grid & Balcony",
+    floor: "Lantai 2 Balkon",
+    position3D: [5.2, 4.0, -1],
+    target3D: [0, 0.5, 0],
+    fovAngle: 60,
+    partnerCompany: "PT Optima Solusi Integrasi",
+    partnerPic: "Hendrik Gunawan (Senior Network Engineer)",
+    partnerPhone: "+62 819-0123-4567",
+    partnerEmail: "hendrik@optimasolusi.co.id",
+    status: "offline",
+    statusLabel: "Offline (Kabel PoE Putus)",
+    ipAddress: "10.30.15.106",
+    macAddress: "5A:22:BE:1C:77:06",
+    resolution: "2560 x 1440 (2K QHD)",
+    rtspUrl: "rtsp://10.30.15.106:554/live/ch0",
+    notes: "Port switch PoE di ceiling truss offline pasca instalasi lampu panggung tambahan.",
+  },
+];
+
+export const DUMMY_CCTV_DATA: CCTVUnit[] = DUMMY_CCTV_GI_GANDUL;
+
+export function getCCTVDataByLocation(locationId: FacilityLocationId): CCTVUnit[] {
+  if (locationId === "auditorium-pln") {
+    return DUMMY_CCTV_AUDITORIUM;
+  }
+  return DUMMY_CCTV_GI_GANDUL;
+}

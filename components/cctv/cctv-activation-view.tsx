@@ -1,7 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
-import { DUMMY_CCTV_DATA, CCTVUnit } from "@/types/cctv";
+import React, { useState, useMemo } from "react";
+import {
+  CCTVUnit,
+  FacilityLocationId,
+  FACILITY_LOCATIONS,
+  getCCTVDataByLocation,
+} from "@/types/cctv";
 import { CCTV3DLocator } from "./cctv-3d-locator";
 import { CCTVTable } from "./cctv-table";
 import { CCTVDetailModal } from "./cctv-detail-modal";
@@ -17,9 +22,28 @@ import {
 import { Button } from "@/components/ui/button";
 
 export function CCTVActivationView() {
-  const [cctvList] = useState<CCTVUnit[]>(DUMMY_CCTV_DATA);
-  const [selectedCCTVId, setSelectedCCTVId] = useState<string | null>("cctv-01");
+  const [selectedLocationId, setSelectedLocationId] =
+    useState<FacilityLocationId>("gi-gandul");
+
+  const currentLocation =
+    FACILITY_LOCATIONS.find((l) => l.id === selectedLocationId) ||
+    FACILITY_LOCATIONS[0];
+
+  const cctvList = useMemo(
+    () => getCCTVDataByLocation(selectedLocationId),
+    [selectedLocationId]
+  );
+
+  const [selectedCCTVId, setSelectedCCTVId] = useState<string | null>(null);
   const [modalCCTV, setModalCCTV] = useState<CCTVUnit | null>(null);
+
+  // Derive active CCTV: if selectedCCTVId is present in current location list, use it; else fallback to first item
+  const activeCCTVId = useMemo(() => {
+    if (selectedCCTVId && cctvList.some((c) => c.id === selectedCCTVId)) {
+      return selectedCCTVId;
+    }
+    return cctvList[0]?.id || null;
+  }, [selectedCCTVId, cctvList]);
 
   const totalCount = cctvList.length;
   const activeCount = cctvList.filter((c) => c.status === "active").length;
@@ -48,7 +72,7 @@ export function CCTVActivationView() {
             </span>
           </div>
           <p className="text-xs text-zinc-500 mt-1">
-            Pencatatan inventaris serial number, masa garansi, kontak mitra, dan pemetaan lokasi presisi 3D di Gardu Induk Gandul.
+            {currentLocation.description}
           </p>
         </div>
 
@@ -58,10 +82,15 @@ export function CCTVActivationView() {
             size="sm"
             className="text-xs h-8 text-zinc-700 border-zinc-200 gap-1.5"
             onClick={() => {
-              const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cctvList, null, 2));
+              const dataStr =
+                "data:text/json;charset=utf-8," +
+                encodeURIComponent(JSON.stringify(cctvList, null, 2));
               const downloadAnchor = document.createElement("a");
               downloadAnchor.setAttribute("href", dataStr);
-              downloadAnchor.setAttribute("download", "pln-cctv-activation-data.json");
+              downloadAnchor.setAttribute(
+                "download",
+                `pln-cctv-${selectedLocationId}-data.json`
+              );
               document.body.appendChild(downloadAnchor);
               downloadAnchor.click();
               downloadAnchor.remove();
@@ -129,7 +158,7 @@ export function CCTVActivationView() {
           <div className="flex items-center gap-2">
             <Server className="size-4 text-[#00A2E9]" />
             <h2 className="text-sm font-semibold text-zinc-900 tracking-tight">
-              Peta Lokasi Spatial 3D (Digital Twin Substation)
+              Peta Lokasi Spatial 3D ({currentLocation.name})
             </h2>
           </div>
           <span className="text-xs text-zinc-500 hidden sm:flex items-center gap-1.5">
@@ -140,8 +169,13 @@ export function CCTVActivationView() {
 
         <CCTV3DLocator
           cctvList={cctvList}
-          selectedCCTVId={selectedCCTVId}
+          selectedCCTVId={activeCCTVId}
           onSelectCCTV={handleSelectCCTV}
+          selectedLocationId={selectedLocationId}
+          onSelectLocation={(locId) => {
+            setSelectedLocationId(locId);
+            setSelectedCCTVId(null);
+          }}
         />
       </div>
 
@@ -149,7 +183,7 @@ export function CCTVActivationView() {
       <div className="space-y-2">
         <CCTVTable
           cctvList={cctvList}
-          selectedCCTVId={selectedCCTVId}
+          selectedCCTVId={activeCCTVId}
           onSelectCCTV={handleSelectCCTV}
           onOpenDetail={handleOpenDetail}
         />

@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { CCTVUnit } from "@/types/cctv";
+import { CCTVUnit, FacilityLocationId, FACILITY_LOCATIONS } from "@/types/cctv";
 import {
   RotateCcw,
   Compass,
@@ -15,18 +15,25 @@ import {
   MousePointerClick,
   Lock,
   Unlock,
+  ChevronDown,
+  Check,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface CCTV3DLocatorProps {
   cctvList: CCTVUnit[];
   selectedCCTVId: string | null;
   onSelectCCTV: (id: string) => void;
+  selectedLocationId?: FacilityLocationId;
+  onSelectLocation?: (locationId: FacilityLocationId) => void;
 }
 
 export function CCTV3DLocator({
   cctvList,
   selectedCCTVId,
   onSelectCCTV,
+  selectedLocationId = "gi-gandul",
+  onSelectLocation,
 }: CCTV3DLocatorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mountRef = useRef<HTMLDivElement>(null);
@@ -35,7 +42,29 @@ export function CCTV3DLocator({
   const controlsRef = useRef<OrbitControls | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const markersGroupRef = useRef<THREE.Group | null>(null);
+  const environmentGroupRef = useRef<THREE.Group | null>(null);
   const markerMeshesMap = useRef<Map<string, THREE.Object3D>>(new Map());
+
+  // Location Dropdown State
+  const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
+  const locationMenuRef = useRef<HTMLDivElement>(null);
+  const currentLocation =
+    FACILITY_LOCATIONS.find((l) => l.id === selectedLocationId) ||
+    FACILITY_LOCATIONS[0];
+
+  // Close location dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        locationMenuRef.current &&
+        !locationMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsLocationMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Interaction Lock State: map controls disabled until double-clicked
   const [isActivated, setIsActivated] = useState(false);
@@ -125,8 +154,15 @@ export function CCTV3DLocator({
     fillLight.position.set(-15, 10, -10);
     scene.add(fillLight);
 
-    // 6. Build Architectural Substation Facility Model
-    buildSubstationEnvironment(scene);
+    // 6. Build Architectural Facility Model
+    const envGroup = new THREE.Group();
+    scene.add(envGroup);
+    environmentGroupRef.current = envGroup;
+    if (selectedLocationId === "auditorium-pln") {
+      buildAuditoriumEnvironment(envGroup);
+    } else {
+      buildSubstationEnvironment(envGroup);
+    }
 
     // 7. Group for CCTV Markers
     const markersGroup = new THREE.Group();
@@ -206,7 +242,40 @@ export function CCTV3DLocator({
         container.removeChild(renderer.domElement);
       }
     };
-  }, [onSelectCCTV]);
+  }, [onSelectCCTV, selectedLocationId]);
+
+  // Dynamic Rebuilding of 3D Facility Environment on Location Change
+  useEffect(() => {
+    const envGroup = environmentGroupRef.current;
+    if (!envGroup) return;
+
+    // Dispose and clear previous environment objects
+    while (envGroup.children.length > 0) {
+      const child = envGroup.children[0];
+      envGroup.remove(child);
+      if ((child as THREE.Mesh).geometry) {
+        (child as THREE.Mesh).geometry.dispose();
+      }
+    }
+
+    if (selectedLocationId === "auditorium-pln") {
+      buildAuditoriumEnvironment(envGroup);
+      if (controlsRef.current) {
+        controlsRef.current.target.set(0, 1.2, 0);
+      }
+      if (cameraRef.current) {
+        cameraRef.current.position.set(10, 12, 14);
+      }
+    } else {
+      buildSubstationEnvironment(envGroup);
+      if (controlsRef.current) {
+        controlsRef.current.target.set(0, 1, 0);
+      }
+      if (cameraRef.current) {
+        cameraRef.current.position.set(14, 16, 20);
+      }
+    }
+  }, [selectedLocationId]);
 
   // Update CCTV Markers when list or selection changes
   useEffect(() => {
@@ -331,11 +400,68 @@ export function CCTV3DLocator({
       <div className="absolute top-3 inset-x-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
         {/* Left: Facility Badge & Status Filter */}
         <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-200/80 shadow-xs pointer-events-auto">
-          <div className="flex items-center gap-2 pr-3 border-r border-zinc-200">
-            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-semibold text-zinc-900 tracking-tight">
-              Digital Twin GI Gandul
-            </span>
+          {/* Location Dropdown Trigger & Options Popover */}
+          <div className="relative pr-3 border-r border-zinc-200" ref={locationMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsLocationMenuOpen(!isLocationMenuOpen)}
+              className="flex items-center gap-2 px-2 py-1 -my-0.5 rounded-md hover:bg-zinc-100 transition-colors cursor-pointer select-none group/loc"
+              title="Ganti Lokasi Fasilitas Digital Twin"
+            >
+              <span className={cn("size-2 rounded-full animate-pulse", currentLocation.dotColor)} />
+              <span className="text-xs font-semibold text-zinc-900 tracking-tight">
+                {currentLocation.name}
+              </span>
+              <ChevronDown
+                className={cn(
+                  "size-3.5 text-zinc-400 group-hover/loc:text-zinc-700 transition-transform duration-200",
+                  isLocationMenuOpen && "rotate-180"
+                )}
+              />
+            </button>
+
+            {/* Dropdown Options Popover matching the user's video UX */}
+            {isLocationMenuOpen && (
+              <div className="absolute top-full left-0 mt-2 z-50 w-64 rounded-xl border border-zinc-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  Pilih Lokasi Fasilitas
+                </div>
+                {FACILITY_LOCATIONS.map((loc) => {
+                  const isSelected = (selectedLocationId || "gi-gandul") === loc.id;
+                  return (
+                    <button
+                      key={loc.id}
+                      type="button"
+                      onClick={() => {
+                        onSelectLocation?.(loc.id);
+                        setIsLocationMenuOpen(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs transition-colors cursor-pointer text-left",
+                        isSelected
+                          ? "bg-zinc-100/90 text-zinc-900 font-semibold"
+                          : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={cn("size-2 rounded-full shrink-0", loc.dotColor)} />
+                        <div className="flex flex-col min-w-0">
+                          <span className="truncate leading-tight font-medium text-zinc-900">
+                            {loc.name}
+                          </span>
+                          <span className="text-[10px] text-zinc-400 truncate leading-tight mt-0.5">
+                            {loc.subtitle}
+                          </span>
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <Check className="size-4 text-zinc-900 shrink-0 ml-1" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Filter Pills */}
@@ -545,7 +671,7 @@ export function CCTV3DLocator({
 // Procedural Three.js Substation & CCTV Marker Builder Functions
 // ============================================================================
 
-function buildSubstationEnvironment(scene: THREE.Scene) {
+function buildSubstationEnvironment(scene: THREE.Group | THREE.Scene) {
   // 1. Ground Plane
   const groundGeo = new THREE.PlaneGeometry(36, 36);
   const groundMat = new THREE.MeshStandardMaterial({
@@ -669,6 +795,189 @@ function buildSubstationEnvironment(scene: THREE.Scene) {
   const guardLines = new THREE.LineSegments(guardEdges, bldgLineMat);
   guardLines.position.copy(guard.position);
   scene.add(guardLines);
+}
+
+function buildAuditoriumEnvironment(parent: THREE.Group | THREE.Scene) {
+  // 1. Auditorium Floor (Carpet/Parquet)
+  const floorGeo = new THREE.PlaneGeometry(28, 28);
+  const floorMat = new THREE.MeshStandardMaterial({
+    color: "#F1F5F9",
+    roughness: 0.8,
+    metalness: 0.05,
+  });
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = 0;
+  floor.receiveShadow = true;
+  parent.add(floor);
+
+  // Grid Lines
+  const grid = new THREE.GridHelper(28, 28, "#CBD5E1", "#E2E8F0");
+  grid.position.y = 0.01;
+  parent.add(grid);
+
+  // Line segment border material
+  const lineMat = new THREE.LineBasicMaterial({ color: "#94A3B8" });
+
+  // 2. Main Elevated Stage (Panggung Utama BOD & RUPS)
+  const stageGeo = new THREE.BoxGeometry(16, 0.8, 8);
+  const stageMat = new THREE.MeshStandardMaterial({
+    color: "#003B5C", // PLN Navy Stage Trim
+    roughness: 0.6,
+    metalness: 0.2,
+  });
+  const stage = new THREE.Mesh(stageGeo, stageMat);
+  stage.position.set(0, 0.4, -7);
+  stage.castShadow = true;
+  stage.receiveShadow = true;
+  parent.add(stage);
+
+  // Stage Top Surface (Lantai Panggung Kayu/Akustik)
+  const stageTopGeo = new THREE.BoxGeometry(15.8, 0.05, 7.8);
+  const stageTopMat = new THREE.MeshStandardMaterial({
+    color: "#FFFFFF",
+    roughness: 0.5,
+  });
+  const stageTop = new THREE.Mesh(stageTopGeo, stageTopMat);
+  stageTop.position.set(0, 0.82, -7);
+  stageTop.receiveShadow = true;
+  parent.add(stageTop);
+
+  // 3. Huge LED Video Wall Backdrop (Screen Panggung)
+  const ledWallGeo = new THREE.BoxGeometry(12, 4.5, 0.3);
+  const ledWallMat = new THREE.MeshStandardMaterial({
+    color: "#0F172A",
+    roughness: 0.2,
+    metalness: 0.8,
+  });
+  const ledWall = new THREE.Mesh(ledWallGeo, ledWallMat);
+  ledWall.position.set(0, 3.1, -10.5);
+  ledWall.castShadow = true;
+  parent.add(ledWall);
+
+  // LED Screen Display Panel (Glow PLN Cyan Frame)
+  const screenFaceGeo = new THREE.PlaneGeometry(11.6, 4.1);
+  const screenFaceMat = new THREE.MeshBasicMaterial({
+    color: "#003B5C",
+  });
+  const screenFace = new THREE.Mesh(screenFaceGeo, screenFaceMat);
+  screenFace.position.set(0, 3.1, -10.34);
+  parent.add(screenFace);
+
+  // Cyan & Electric Yellow Accent Lines on LED Wall
+  const cyanBarGeo = new THREE.BoxGeometry(11.8, 0.1, 0.05);
+  const cyanBarMat = new THREE.MeshBasicMaterial({ color: "#00A2E9" });
+  const topBar = new THREE.Mesh(cyanBarGeo, cyanBarMat);
+  topBar.position.set(0, 5.25, -10.33);
+  parent.add(topBar);
+
+  const bottomBar = new THREE.Mesh(cyanBarGeo, cyanBarMat);
+  bottomBar.position.set(0, 0.95, -10.33);
+  parent.add(bottomBar);
+
+  // 4. Podiums / Mimbar Direksi di Panggung
+  const podiumGeo = new THREE.BoxGeometry(1.2, 1.2, 0.8);
+  const podiumMat = new THREE.MeshStandardMaterial({
+    color: "#00A2E9",
+    roughness: 0.3,
+    metalness: 0.4,
+  });
+  const podium = new THREE.Mesh(podiumGeo, podiumMat);
+  podium.position.set(0, 1.4, -6.5);
+  podium.castShadow = true;
+  parent.add(podium);
+
+  // 5. VIP Round Tables & Chairs (Area Audiens Depan)
+  const tablePositions = [
+    [-4, -2],
+    [0, -2],
+    [4, -2],
+    [-2, 1],
+    [2, 1],
+  ];
+
+  tablePositions.forEach(([tx, tz]) => {
+    // Round table disc
+    const tableGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.1, 24);
+    const tableMat = new THREE.MeshStandardMaterial({ color: "#FFFFFF", roughness: 0.6 });
+    const table = new THREE.Mesh(tableGeo, tableMat);
+    table.position.set(tx, 0.7, tz);
+    table.castShadow = true;
+    table.receiveShadow = true;
+    parent.add(table);
+
+    // Table leg
+    const legGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.7, 12);
+    const legMat = new THREE.MeshStandardMaterial({ color: "#64748B" });
+    const leg = new THREE.Mesh(legGeo, legMat);
+    leg.position.set(tx, 0.35, tz);
+    parent.add(leg);
+
+    // Small centerpiece marker
+    const centerGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.15, 12);
+    const centerMat = new THREE.MeshBasicMaterial({ color: "#FFD100" });
+    const center = new THREE.Mesh(centerGeo, centerMat);
+    center.position.set(tx, 0.8, tz);
+    parent.add(center);
+  });
+
+  // 6. Audience Seating Tier (Area Audiens Belakang)
+  const rows = [
+    { z: 3.5, width: 14 },
+    { z: 5.5, width: 16 },
+  ];
+  rows.forEach((row, rIdx) => {
+    const seatRowGeo = new THREE.BoxGeometry(row.width, 0.4, 0.8);
+    const seatRowMat = new THREE.MeshStandardMaterial({
+      color: "#E2E8F0",
+      roughness: 0.7,
+    });
+    const seatRow = new THREE.Mesh(seatRowGeo, seatRowMat);
+    seatRow.position.set(0, 0.2 + rIdx * 0.2, row.z);
+    seatRow.castShadow = true;
+    seatRow.receiveShadow = true;
+    parent.add(seatRow);
+  });
+
+  // 7. Master Control Booth & Audio Desk (Mezzanine Belakang)
+  const boothGeo = new THREE.BoxGeometry(4.5, 2.5, 2.5);
+  const boothMat = new THREE.MeshStandardMaterial({
+    color: "#FFFFFF",
+    roughness: 0.7,
+  });
+  const booth = new THREE.Mesh(boothGeo, boothMat);
+  booth.position.set(4.5, 1.25, 4.5);
+  booth.castShadow = true;
+  booth.receiveShadow = true;
+  parent.add(booth);
+
+  const boothEdges = new THREE.EdgesGeometry(boothGeo);
+  const boothLines = new THREE.LineSegments(boothEdges, lineMat);
+  boothLines.position.copy(booth.position);
+  parent.add(boothLines);
+
+  // Booth Glass Window / Desk Line
+  const glassGeo = new THREE.BoxGeometry(4.1, 0.8, 0.1);
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: "#00A2E9",
+    transparent: true,
+    opacity: 0.6,
+  });
+  const glass = new THREE.Mesh(glassGeo, glassMat);
+  glass.position.set(4.5, 1.8, 3.2);
+  parent.add(glass);
+
+  // 8. Overhead Lighting Truss Rails (Rig Panggung & Auditorium)
+  const trussMat = new THREE.LineBasicMaterial({ color: "#64748B" });
+  for (const zPos of [-6, -2, 2]) {
+    const trussPts = [
+      new THREE.Vector3(-10, 4.5, zPos),
+      new THREE.Vector3(10, 4.5, zPos),
+    ];
+    const trussGeo = new THREE.BufferGeometry().setFromPoints(trussPts);
+    const trussLine = new THREE.Line(trussGeo, trussMat);
+    parent.add(trussLine);
+  }
 }
 
 function createCCTVMarker(cctv: CCTVUnit, isSelected: boolean): THREE.Group {
