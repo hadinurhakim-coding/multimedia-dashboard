@@ -1598,20 +1598,7 @@ function buildAuditoriumEnvironment(parent: THREE.Group | THREE.Scene) {
     }
   }
 
-  // 7. SIDE CATERING BUFFET STATION & PA SPEAKERS
-  const tableClothMat = new THREE.MeshStandardMaterial({
-    color: "#FAF5FF", // Cream/white tablecloth
-    roughness: 0.6,
-  });
-
-  // Side Catering Buffet Station (Sesuai Foto 2 di sebelah kiri)
-  const buffetGeo = new THREE.BoxGeometry(1.2, 0.75, 4.5);
-  const buffet = new THREE.Mesh(buffetGeo, tableClothMat);
-  buffet.position.set(-9.2, 0.375, -2.5);
-  buffet.castShadow = true;
-  parent.add(buffet);
-
-  // PA Audio Speakers on Black Tripods (Sesuai Foto 2 & 3)
+  // 7. PA AUDIO SPEAKERS ON BLACK TRIPODS (Sesuai Foto 2 & 3)
   for (const spkX of [-8.5, 8.5]) {
     const spkStandGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.8, 8);
     const spkStandMat = new THREE.MeshStandardMaterial({ color: "#0F172A" });
