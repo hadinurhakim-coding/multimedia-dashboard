@@ -1598,67 +1598,10 @@ function buildAuditoriumEnvironment(parent: THREE.Group | THREE.Scene) {
     }
   }
 
-  // 7. VIP ROUND BANQUET TABLES & AUDIENCE CHAIRS (Area Audiens Sesuai Foto & Video)
-  const tablePositions = [
-    [-4.5, -1.5],
-    [0, -1.5],
-    [4.5, -1.5],
-    [-6.5, 2.0],
-    [-2.2, 2.0],
-    [2.2, 2.0],
-    [6.5, 2.0],
-    [-4.5, 5.5],
-    [0, 5.5],
-    [4.5, 5.5],
-  ];
-
+  // 7. SIDE CATERING BUFFET STATION & PA SPEAKERS
   const tableClothMat = new THREE.MeshStandardMaterial({
-    color: "#FAF5FF", // Cream/white banquet tablecloth
+    color: "#FAF5FF", // Cream/white tablecloth
     roughness: 0.6,
-  });
-
-  const banquetChairMat = new THREE.MeshStandardMaterial({
-    color: "#6B3212", // Teak wood chair frame
-    roughness: 0.5,
-  });
-
-  tablePositions.forEach(([tx, tz]) => {
-    // Round table with flowing tablecloth
-    const tableTopGeo = new THREE.CylinderGeometry(1.05, 1.05, 0.08, 24);
-    const tableTop = new THREE.Mesh(tableTopGeo, tableClothMat);
-    tableTop.position.set(tx, 0.72, tz);
-    tableTop.castShadow = true;
-    tableTop.receiveShadow = true;
-    parent.add(tableTop);
-
-    // Table skirt drape
-    const drapeGeo = new THREE.CylinderGeometry(1.02, 1.04, 0.68, 24, 1, true);
-    const drape = new THREE.Mesh(drapeGeo, tableClothMat);
-    drape.position.set(tx, 0.35, tz);
-    parent.add(drape);
-
-    // Center floral centerpiece (as seen in Image 2)
-    const flowerGeo = new THREE.SphereGeometry(0.22, 12, 12);
-    const flowerMat = new THREE.MeshStandardMaterial({ color: "#FBBF24", roughness: 0.8 });
-    const flower = new THREE.Mesh(flowerGeo, flowerMat);
-    flower.position.set(tx, 0.88, tz);
-    parent.add(flower);
-
-    // 4 Banquet chairs around each table
-    for (let cAngle = 0; cAngle < Math.PI * 2; cAngle += Math.PI / 2) {
-      const cx = tx + Math.cos(cAngle) * 1.35;
-      const cz = tz + Math.sin(cAngle) * 1.35;
-
-      const chairSeatGeo = new THREE.BoxGeometry(0.38, 0.06, 0.38);
-      const chairSeat = new THREE.Mesh(chairSeatGeo, banquetChairMat);
-      chairSeat.position.set(cx, 0.42, cz);
-      parent.add(chairSeat);
-
-      const chairBackGeo = new THREE.BoxGeometry(0.38, 0.45, 0.05);
-      const chairBack = new THREE.Mesh(chairBackGeo, banquetChairMat);
-      chairBack.position.set(cx, 0.68, cz + 0.16);
-      parent.add(chairBack);
-    }
   });
 
   // Side Catering Buffet Station (Sesuai Foto 2 di sebelah kiri)
