@@ -1587,7 +1587,7 @@ function buildAuditoriumEnvironment(parent: THREE.Group | THREE.Scene) {
     trussMain.position.set(0, 5.8, zTruss);
     parent.add(trussMain);
 
-    // Suspended moving head spotlights with radiating light beams
+    // Suspended moving head spotlights
     for (const spotX of [-5.5, -3.0, 0, 3.0, 5.5]) {
       // Spot fixture housing
       const spotGeo = new THREE.CylinderGeometry(0.16, 0.22, 0.32, 12);
@@ -1595,21 +1595,6 @@ function buildAuditoriumEnvironment(parent: THREE.Group | THREE.Scene) {
       const spot = new THREE.Mesh(spotGeo, spotMat);
       spot.position.set(spotX, 5.5, zTruss);
       parent.add(spot);
-
-      // Angled light beam radiating down towards stage
-      const beamGeo = new THREE.ConeGeometry(1.6, 5.2, 16, 1, true);
-      beamGeo.translate(0, -2.6, 0);
-      const beamMat = new THREE.MeshBasicMaterial({
-        color: spotX === 0 ? "#00A2E9" : spotX < 0 ? "#38BDF8" : "#10B981",
-        transparent: true,
-        opacity: 0.12,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-      });
-      const beam = new THREE.Mesh(beamGeo, beamMat);
-      beam.position.set(spotX, 5.4, zTruss);
-      beam.rotation.x = Math.PI / 12; // tilted down toward stage
-      parent.add(beam);
     }
   }
 
@@ -1961,27 +1946,7 @@ function createCCTVMarker(cctv: CCTVUnit, isSelected: boolean): THREE.Group {
   cameraAssembly.scale.set(1.4, 1.4, 1.4);
   group.add(cameraAssembly);
 
-  // 9. DIRECTION CONE / VISION FRUSTUM (Jangkauan Bidang Pandang Kamera)
-  const dist = Math.min(dir.length(), 6.5);
-  const coneGeo = new THREE.ConeGeometry(dist * 0.45, dist, 16, 1, true);
-  coneGeo.translate(0, -dist / 2, 0);
-  coneGeo.rotateX(-Math.PI / 2);
-
-  const coneMat = new THREE.MeshBasicMaterial({
-    color: statusHex,
-    transparent: true,
-    opacity: isSelected ? 0.35 : 0.12,
-    wireframe: false,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  });
-
-  const cone = new THREE.Mesh(coneGeo, coneMat);
-  cone.position.set(0, 0, 0);
-  cone.lookAt(dir);
-  group.add(cone);
-
-  // 10. STATUS & SELECTION HIGHLIGHTS
+  // 9. STATUS & SELECTION HIGHLIGHTS
   // Glowing Status Torus Ring under the camera
   const statusRingGeo = new THREE.TorusGeometry(0.38, 0.03, 8, 32);
   const statusRingMat = new THREE.MeshBasicMaterial({ color: statusHex });
