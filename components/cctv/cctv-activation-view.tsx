@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   CCTVUnit,
   FacilityLocationId,
@@ -18,6 +18,7 @@ import {
   Server,
   Plus,
   Download,
+  Database,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -25,13 +26,46 @@ export function CCTVActivationView() {
   const [selectedLocationId, setSelectedLocationId] =
     useState<FacilityLocationId>("gi-gandul");
 
+  const [dbData, setDbData] = useState<Record<FacilityLocationId, CCTVUnit[]>>({
+    "gi-gandul": getCCTVDataByLocation("gi-gandul"),
+    "auditorium-pln": getCCTVDataByLocation("auditorium-pln"),
+  });
+  const [isDbConnected, setIsDbConnected] = useState(false);
+
+  // Fetch live CCTV data from Neon PostgreSQL API
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchFromNeon() {
+      try {
+        const res = await fetch(`/api/cctv?facilityId=${selectedLocationId}`);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          if (isMounted) {
+            setDbData((prev) => ({
+              ...prev,
+              [selectedLocationId]: json.data,
+            }));
+            setIsDbConnected(true);
+          }
+        }
+      } catch (err) {
+        console.warn("Neon API fetch fallback to local cache:", err);
+      }
+    }
+    fetchFromNeon();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedLocationId]);
+
   const currentLocation =
     FACILITY_LOCATIONS.find((l) => l.id === selectedLocationId) ||
     FACILITY_LOCATIONS[0];
 
   const cctvList = useMemo(
-    () => getCCTVDataByLocation(selectedLocationId),
-    [selectedLocationId]
+    () => dbData[selectedLocationId] || getCCTVDataByLocation(selectedLocationId),
+    [dbData, selectedLocationId]
   );
 
   const [selectedCCTVId, setSelectedCCTVId] = useState<string | null>(null);
@@ -70,6 +104,12 @@ export function CCTVActivationView() {
             <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 text-[#00A2E9] border border-[#00A2E9]/20">
               Surveillance as a Service
             </span>
+            {isDbConnected && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                <Database className="size-3 text-emerald-600" />
+                Neon DB Live
+              </span>
+            )}
           </div>
           <p className="text-xs text-zinc-500 mt-1">
             {currentLocation.description}

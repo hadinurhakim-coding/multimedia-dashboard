@@ -79,6 +79,37 @@ export function EventView({
     }
   }, [data]);
 
+  // Fetch initial events & members from Neon cloud database
+  React.useEffect(() => {
+    let isMounted = true;
+    async function fetchEventsFromNeon() {
+      try {
+        const res = await fetch("/api/events");
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.success && Array.isArray(json.events) && json.events.length > 0) {
+          if (isMounted) {
+            setData((prev) =>
+              buildOvertimeResponse(
+                json.members && json.members.length > 0 ? json.members : prev.members,
+                json.events,
+                prev.taskTypes,
+                prev.rooms,
+                new Date(2026, 10, 12, 12, 0, 0)
+              )
+            );
+          }
+        }
+      } catch (err) {
+        console.warn("Neon events API fetch fallback to local:", err);
+      }
+    }
+    fetchEventsFromNeon();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const handleOpenAddModal = (dateStr?: string) => {
     setEventToEdit(null);
     setPreselectedDate(dateStr);
