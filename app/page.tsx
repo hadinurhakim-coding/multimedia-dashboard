@@ -39,7 +39,6 @@ import {
 import { cn } from "@/lib/utils";
 import { CCTVActivationView } from "@/components/cctv/cctv-activation-view";
 import { EventView, EventSubmenuTab } from "@/components/event/event-view";
-import { MultimediaComproView } from "@/components/home/multimedia-compro-view";
 
 export default function DashboardShell7Page() {
   const [activeTab, setActiveTab] = React.useState<"home" | "event" | "aktivasi" | "dashboard">("home");
@@ -300,15 +299,11 @@ export default function DashboardShell7Page() {
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 min-w-0">
             {activeTab === "aktivasi" && <CCTVActivationView />}
             {(activeTab === "home" || activeTab === "dashboard") && (
-              <MultimediaComproView
-                onNavigateToEvent={() => {
-                  setActiveTab("event");
-                  setEventSubTab("dashboard");
-                }}
-                onNavigateToAktivasi={() => {
-                  setActiveTab("aktivasi");
-                }}
-              />
+              <div className="flex items-center justify-center min-h-[50vh] w-full text-center py-20">
+                <p className="text-base sm:text-lg font-medium text-zinc-600">
+                  Halaman ini untuk company profile
+                </p>
+              </div>
             )}
             {activeTab === "event" && (
               <React.Suspense
