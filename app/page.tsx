@@ -172,7 +172,7 @@ export default function DashboardShell7Page() {
                           )}
                         >
                           <CalendarDays className="size-3.5 text-zinc-500" />
-                          <span>Jadwal Shift</span>
+                          <span>Penjadwalan & Event</span>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
 
