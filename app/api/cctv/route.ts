@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { connection, NextRequest, NextResponse } from "next/server";
 import { queryNeon } from "@/lib/neon";
 import { CCTVUnit } from "@/types/cctv";
 
@@ -37,6 +37,7 @@ interface CCTVRow {
 }
 
 export async function GET(request: NextRequest) {
+  await connection();
   try {
     const { searchParams } = new URL(request.url);
     const facilityId = searchParams.get("facilityId");

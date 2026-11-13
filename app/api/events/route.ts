@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import { queryNeon } from "@/lib/neon";
 import { OvertimeEvent, Member } from "@/types/event";
 
@@ -34,6 +34,7 @@ interface MemberRow {
 }
 
 export async function GET() {
+  await connection();
   try {
     const eventRows = await queryNeon<EventRow>(`
       SELECT 

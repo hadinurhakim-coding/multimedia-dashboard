@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import { queryNeon } from "@/lib/neon";
 import { FacilityLocation } from "@/types/cctv";
 
@@ -13,6 +13,7 @@ interface FacilityRow {
 }
 
 export async function GET() {
+  await connection();
   try {
     const rows = await queryNeon<FacilityRow>(`
       SELECT id, name, subtitle, description, facility_type, dot_color, badge
