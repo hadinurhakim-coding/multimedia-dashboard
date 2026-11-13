@@ -269,16 +269,6 @@ def main():
             "rtsp://10.30.15.103:554/live/ch0", "Kamera terpasang di bawah soffit balkon lengkung putih sisi kanan (sesuai foto lingkaran merah) mengarah ke panggung utama."
         ),
         (
-            "cctv-aud-04", "auditorium-pln", "SN-PLN-AUD-014", "Kamera PTZ 04 — Bawah Videotron Tengah (Stage Front)",
-            "Sony BRC-X400 (4K PTZ Broadcast Camera)", "Robotic PTZ 4K Low-Angle",
-            "2024-06-11", "2024-06-28", "2027-06-27", "Valid",
-            "Auditorium PLN — Bawah Videotron Tengah Panggung", "Panggung Utama (Center Low)", "Lantai 1 Panggung",
-            0.000, 1.250, -9.800, 0.000, 1.000, 0.000, 60.0,
-            "PT Telkom Infra Solusindo", "Budi Prasetyo (Lead System Engineer)", "+62 812-9876-5432", "budi.prasetyo@telkominfra.co.id",
-            "warning", "Perlu Kalibrasi Preset Pan/Tilt", "10.30.15.104", "5A:22:BE:1C:77:04", "3840 x 2160 (4K UHD)",
-            "rtsp://10.30.15.104:554/live/ch0", "Kamera PTZ tengah di bawah layar videotron (sesuai foto 1) untuk penangkapan interaksi tamu VIP dan audiens."
-        ),
-        (
             "cctv-aud-05", "auditorium-pln", "SN-PLN-AUD-015", "Kamera 05 — Master Control & Mezzanine Belakang (FOH)",
             "Dahua IPC-HDBW5442R-ASE (4MP AI Low-Light)", "Dome Indoor Low-Light",
             "2024-07-22", "2024-08-05", "2027-08-04", "Valid",
