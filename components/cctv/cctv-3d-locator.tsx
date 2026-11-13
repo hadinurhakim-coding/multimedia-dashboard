@@ -10,6 +10,8 @@ import {
   ChevronDown,
   Check,
   RotateCcw,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -318,7 +320,18 @@ export function CCTV3DLocator({
   const activeKeysRef = useRef<Set<string>>(new Set());
   const isDraggingRef = useRef<boolean>(false);
   const lastMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const dragMovedDistRef = useRef<number>(0);
   const nearbyCCTVRef = useRef<string | null>(null);
+
+  // Fullscreen & Mobile Touch Joystick State/Refs
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const wasNativeFullscreenRef = useRef<boolean>(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [isJoystickActive, setIsJoystickActive] = useState(false);
+  const joystickVecRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const joystickBaseRef = useRef<HTMLDivElement>(null);
+  const joystickKnobRef = useRef<HTMLDivElement>(null);
+  const joystickPointerIdRef = useRef<number | null>(null);
 
   // Location Dropdown State
   const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
@@ -345,6 +358,84 @@ export function CCTV3DLocator({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Detect mobile / touch device only (never render virtual joystick on desktop)
+  useEffect(() => {
+    const coarseQuery = window.matchMedia("(pointer: coarse)");
+    const noHoverQuery = window.matchMedia("(hover: none)");
+
+    const updateMobileStatus = () => {
+      const hasTouch =
+        navigator.maxTouchPoints > 0 || "ontouchstart" in window;
+      const isCoarseNoHover = coarseQuery.matches && noHoverQuery.matches;
+      const isCompactTouch = hasTouch && window.innerWidth < 1024;
+      setIsMobileDevice(isCoarseNoHover || isCompactTouch);
+    };
+
+    updateMobileStatus();
+    coarseQuery.addEventListener?.("change", updateMobileStatus);
+    noHoverQuery.addEventListener?.("change", updateMobileStatus);
+    window.addEventListener("resize", updateMobileStatus);
+
+    return () => {
+      coarseQuery.removeEventListener?.("change", updateMobileStatus);
+      noHoverQuery.removeEventListener?.("change", updateMobileStatus);
+      window.removeEventListener("resize", updateMobileStatus);
+    };
+  }, []);
+
+  // Sync Fullscreen state with Browser Fullscreen API & Esc / Scroll Lock
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const activeEl = document.fullscreenElement;
+      if (activeEl === containerRef.current) {
+        wasNativeFullscreenRef.current = true;
+        setIsFullscreen(true);
+      } else if (wasNativeFullscreenRef.current) {
+        wasNativeFullscreenRef.current = false;
+        setIsFullscreen(false);
+      }
+    };
+
+    const handleEscExit = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !document.fullscreenElement) {
+        setIsFullscreen(false);
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    window.addEventListener("keydown", handleEscExit);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      window.removeEventListener("keydown", handleEscExit);
+    };
+  }, []);
+
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    if (isFullscreen) {
+      document.body.style.overflow = "hidden";
+    }
+
+    const rafId = requestAnimationFrame(() => {
+      const container = mountRef.current;
+      const camera = cameraRef.current;
+      const renderer = rendererRef.current;
+      if (!container || !camera || !renderer) return;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (w > 0 && h > 0) {
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      }
+    });
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isFullscreen]);
 
   // Initialize Three.js Scene with 3D Character Controller
   useEffect(() => {
@@ -443,6 +534,7 @@ export function CCTV3DLocator({
     const mouse = new THREE.Vector2();
 
     const handleClick = (event: MouseEvent) => {
+      if (dragMovedDistRef.current > 6) return;
       const rect = renderer.domElement.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -463,43 +555,96 @@ export function CCTV3DLocator({
 
     renderer.domElement.addEventListener("click", handleClick);
 
-    // 9. Mouse Look Events (Pointer Lock + Click & Drag)
+    // 9. Camera Look Events (Desktop Pointer Lock + Click-Drag / Mobile Touch Drag & Pinch)
     const domEl = renderer.domElement;
+    domEl.style.touchAction = "none";
+    const activeTouchPointers = new Map<number, { x: number; y: number }>();
+    let prevPinchDist: number | null = null;
 
-    const onMouseDown = (e: MouseEvent) => {
-      // Request pointer lock on canvas click for FPS/TPS look
-      if (document.pointerLockElement !== domEl) {
-        domEl.requestPointerLock?.();
-      }
-      isDraggingRef.current = true;
-      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+    const getPinchDist = () => {
+      const pts = Array.from(activeTouchPointers.values());
+      if (pts.length < 2) return null;
+      return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
     };
 
-    const onMouseMove = (e: MouseEvent) => {
-      const isLocked = document.pointerLockElement === domEl;
-      if (isLocked) {
-        const sens = 0.0026;
-        yawRef.current -= e.movementX * sens;
-        pitchRef.current = Math.max(
-          -0.35,
-          Math.min(1.15, pitchRef.current + e.movementY * sens)
-        );
-      } else if (isDraggingRef.current) {
-        const sens = 0.0035;
-        const dx = e.clientX - lastMousePosRef.current.x;
-        const dy = e.clientY - lastMousePosRef.current.y;
+    const onPointerDown = (e: PointerEvent) => {
+      dragMovedDistRef.current = 0;
+
+      if (e.pointerType === "mouse") {
+        if (document.pointerLockElement !== domEl) {
+          domEl.requestPointerLock?.();
+        }
+        isDraggingRef.current = true;
         lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+        return;
+      }
 
-        yawRef.current -= dx * sens;
+      // Touch / Pen drag to rotate view on mobile devices
+      domEl.setPointerCapture?.(e.pointerId);
+      activeTouchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      prevPinchDist = getPinchDist();
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") {
+        const isLocked = document.pointerLockElement === domEl;
+        if (isLocked) {
+          const sens = 0.0026;
+          yawRef.current -= e.movementX * sens;
+          pitchRef.current = Math.max(
+            -0.35,
+            Math.min(1.15, pitchRef.current + e.movementY * sens)
+          );
+        } else if (isDraggingRef.current) {
+          const sens = 0.0035;
+          const dx = e.clientX - lastMousePosRef.current.x;
+          const dy = e.clientY - lastMousePosRef.current.y;
+          dragMovedDistRef.current += Math.hypot(dx, dy);
+          lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+
+          yawRef.current -= dx * sens;
+          pitchRef.current = Math.max(
+            -0.35,
+            Math.min(1.15, pitchRef.current + dy * sens)
+          );
+        }
+        return;
+      }
+
+      if (!activeTouchPointers.has(e.pointerId)) return;
+      const prev = activeTouchPointers.get(e.pointerId)!;
+      const dx = e.clientX - prev.x;
+      const dy = e.clientY - prev.y;
+      dragMovedDistRef.current += Math.hypot(dx, dy);
+      activeTouchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (activeTouchPointers.size === 1) {
+        const touchSens = 0.0048;
+        yawRef.current -= dx * touchSens;
         pitchRef.current = Math.max(
           -0.35,
-          Math.min(1.15, pitchRef.current + dy * sens)
+          Math.min(1.15, pitchRef.current + dy * touchSens)
         );
+      } else if (activeTouchPointers.size === 2) {
+        const nextPinch = getPinchDist();
+        if (nextPinch !== null && prevPinchDist !== null) {
+          const deltaPinch = nextPinch - prevPinchDist;
+          camDistRef.current = Math.max(
+            1.2,
+            Math.min(7.5, camDistRef.current - deltaPinch * 0.012)
+          );
+        }
+        prevPinchDist = nextPinch;
       }
     };
 
-    const onMouseUp = () => {
-      isDraggingRef.current = false;
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") {
+        isDraggingRef.current = false;
+        return;
+      }
+      activeTouchPointers.delete(e.pointerId);
+      prevPinchDist = getPinchDist();
     };
 
     const onWheel = (e: WheelEvent) => {
@@ -510,9 +655,10 @@ export function CCTV3DLocator({
       );
     };
 
-    domEl.addEventListener("mousedown", onMouseDown);
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
+    domEl.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
     domEl.addEventListener("wheel", onWheel, { passive: false });
 
     // 10. Keyboard Controls for Movement (WASD + Shift)
@@ -573,11 +719,34 @@ export function CCTV3DLocator({
       if (keys.has("KeyD") || keys.has("ArrowRight")) moveDir.add(right);
       if (keys.has("KeyA") || keys.has("ArrowLeft")) moveDir.sub(right);
 
+      const hasKeyInput = moveDir.lengthSq() > 0.001;
+      const joy = joystickVecRef.current;
+      const joyMag = Math.hypot(joy.x, joy.y);
+      const hasJoyInput = joyMag > 0.08;
+
+      if (hasJoyInput) {
+        moveDir.addScaledVector(forward, joy.y);
+        moveDir.addScaledVector(right, joy.x);
+      }
+
       const isMoving = moveDir.lengthSq() > 0.001;
 
       if (isMoving) {
         moveDir.normalize();
-        const speed = isShift ? 6.2 : 3.2; // m/s
+        const clampedJoy = Math.min(1, joyMag);
+        const speed = hasKeyInput
+          ? isShift
+            ? 6.2
+            : 3.2
+          : (clampedJoy > 0.85 ? 5.6 : 3.4) * clampedJoy;
+        const animSpeed = hasKeyInput
+          ? isShift
+            ? 1.6
+            : 1.0
+          : clampedJoy > 0.85
+            ? 1.45
+            : Math.max(0.65, clampedJoy);
+
         charPos.x += moveDir.x * speed * delta;
         charPos.z += moveDir.z * speed * delta;
 
@@ -590,7 +759,7 @@ export function CCTV3DLocator({
           characterGroupRef.current.rotation.y += diff * 0.25;
         }
 
-        characterAnimRef.current?.(true, isShift ? 1.6 : 1.0, delta);
+        characterAnimRef.current?.(true, animSpeed, delta);
       } else {
         characterAnimRef.current?.(false, 1.0, delta);
       }
@@ -662,9 +831,10 @@ export function CCTV3DLocator({
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener("click", handleClick);
       renderer.domElement.removeEventListener("contextmenu", handleContextMenu);
-      domEl.removeEventListener("mousedown", onMouseDown);
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
+      domEl.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
       domEl.removeEventListener("wheel", onWheel);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
@@ -740,16 +910,107 @@ export function CCTV3DLocator({
   }, [selectedCCTVId, cctvList]);
 
   const handleResetCharacter = useCallback(() => {
-    characterPosRef.current.set(0, 0, 7.5);
+    const startZ = selectedLocationId === "auditorium-pln" ? 7.5 : 6.0;
+    characterPosRef.current.set(0, 0, startZ);
     yawRef.current = 0;
     pitchRef.current = 0.20;
     camDistRef.current = 3.4;
+  }, [selectedLocationId]);
+
+  const handleToggleFullscreen = useCallback(() => {
+    if (!isFullscreen) {
+      setIsFullscreen(true);
+      const el = containerRef.current;
+      if (el?.requestFullscreen) {
+        el.requestFullscreen().catch(() => {
+          // Fallback to fixed viewport fullscreen (e.g. iOS Safari)
+        });
+      }
+    } else {
+      if (document.fullscreenElement) {
+        document.exitFullscreen?.().catch(() => {});
+      }
+      setIsFullscreen(false);
+    }
+  }, [isFullscreen]);
+
+  // Mobile-only Virtual Joystick Pointer Handlers (supports simultaneous look drag)
+  const updateJoystickFromPointer = useCallback(
+    (clientX: number, clientY: number) => {
+      const base = joystickBaseRef.current;
+      const knob = joystickKnobRef.current;
+      if (!base || !knob) return;
+
+      const rect = base.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const maxRadius = 38;
+
+      let dx = clientX - centerX;
+      let dy = clientY - centerY;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist > maxRadius) {
+        dx = (dx / dist) * maxRadius;
+        dy = (dy / dist) * maxRadius;
+      }
+
+      knob.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+      joystickVecRef.current = {
+        x: dx / maxRadius,
+        y: -dy / maxRadius,
+      };
+    },
+    []
+  );
+
+  const resetJoystick = useCallback(() => {
+    joystickPointerIdRef.current = null;
+    joystickVecRef.current = { x: 0, y: 0 };
+    if (joystickKnobRef.current) {
+      joystickKnobRef.current.style.transform = "translate3d(0px, 0px, 0)";
+    }
+    setIsJoystickActive(false);
   }, []);
+
+  const handleJoystickPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      joystickPointerIdRef.current = e.pointerId;
+      setIsJoystickActive(true);
+      updateJoystickFromPointer(e.clientX, e.clientY);
+    },
+    [updateJoystickFromPointer]
+  );
+
+  const handleJoystickPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (joystickPointerIdRef.current !== e.pointerId) return;
+      e.stopPropagation();
+      updateJoystickFromPointer(e.clientX, e.clientY);
+    },
+    [updateJoystickFromPointer]
+  );
+
+  const handleJoystickPointerEnd = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (joystickPointerIdRef.current !== e.pointerId) return;
+      e.stopPropagation();
+      resetJoystick();
+    },
+    [resetJoystick]
+  );
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-[620px] bg-zinc-950 rounded-xl overflow-hidden border border-zinc-200 select-none shadow-sm focus:outline-none"
+      className={cn(
+        "bg-zinc-950 overflow-hidden select-none focus:outline-none",
+        isFullscreen
+          ? "fixed inset-0 z-50 w-screen h-dvh rounded-none border-0"
+          : "relative w-full h-[620px] rounded-xl border border-zinc-200 shadow-sm"
+      )}
       tabIndex={0}
     >
       {/* Three.js Canvas Container */}
@@ -878,21 +1139,32 @@ export function CCTV3DLocator({
             <span className="text-xs font-semibold text-zinc-900 hidden sm:inline">
               Karakter 3D
             </span>
-            <span className="text-zinc-300 hidden sm:inline">•</span>
-            <span className="text-[11px] text-zinc-600 font-medium hidden md:inline">
-              <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px]">W</kbd>
-              <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] ml-0.5">A</kbd>
-              <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] ml-0.5">S</kbd>
-              <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] ml-0.5">D</kbd> Jalan
-            </span>
-            <span className="text-zinc-300 hidden md:inline">•</span>
-            <span className="text-[11px] text-zinc-600 font-medium hidden md:inline">
-              <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px]">Shift</kbd> Lari
-            </span>
-            <span className="text-zinc-300 hidden sm:inline">•</span>
-            <span className="text-[11px] text-zinc-600 font-medium">
-              🖱️ Arah Pandang
-            </span>
+            {isMobileDevice ? (
+              <>
+                <span className="text-zinc-300 hidden sm:inline">•</span>
+                <span className="text-[11px] text-zinc-600 font-medium">
+                  Joystick Jalan • Geser Layar Pandang
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-zinc-300 hidden sm:inline">•</span>
+                <span className="text-[11px] text-zinc-600 font-medium hidden md:inline">
+                  <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px]">W</kbd>
+                  <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] ml-0.5">A</kbd>
+                  <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] ml-0.5">S</kbd>
+                  <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px] ml-0.5">D</kbd> Jalan
+                </span>
+                <span className="text-zinc-300 hidden md:inline">•</span>
+                <span className="text-[11px] text-zinc-600 font-medium hidden md:inline">
+                  <kbd className="px-1 py-0.5 rounded bg-zinc-100 border border-zinc-200 font-mono text-[10px]">Shift</kbd> Lari
+                </span>
+                <span className="text-zinc-300 hidden sm:inline">•</span>
+                <span className="text-[11px] text-zinc-600 font-medium">
+                  🖱️ Arah Pandang
+                </span>
+              </>
+            )}
           </div>
 
           <button
@@ -907,26 +1179,74 @@ export function CCTV3DLocator({
         </div>
       </div>
 
-      {/* Bottom Floating Area: Nearby CCTV Badge & Status Legend */}
+      {/* Mobile-Only Virtual Joystick (Left Thumb Movement) */}
+      {isMobileDevice && (
+        <div
+          ref={joystickBaseRef}
+          onPointerDown={handleJoystickPointerDown}
+          onPointerMove={handleJoystickPointerMove}
+          onPointerUp={handleJoystickPointerEnd}
+          onPointerCancel={handleJoystickPointerEnd}
+          aria-label="Joystick navigasi karakter 3D"
+          className={cn(
+            "absolute bottom-16 left-4 z-20 size-28 rounded-full bg-white/85 backdrop-blur-md border-2 shadow-lg flex items-center justify-center touch-none select-none pointer-events-auto transition-colors",
+            isJoystickActive ? "border-[#00A2E9]" : "border-zinc-200/90"
+          )}
+        >
+          {/* Directional crosshair markers */}
+          <span className="absolute top-2 left-1/2 -translate-x-1/2 size-1 rounded-full bg-zinc-400/70 pointer-events-none" />
+          <span className="absolute bottom-2 left-1/2 -translate-x-1/2 size-1 rounded-full bg-zinc-400/70 pointer-events-none" />
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 size-1 rounded-full bg-zinc-400/70 pointer-events-none" />
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 size-1 rounded-full bg-zinc-400/70 pointer-events-none" />
+
+          {/* Movable thumb stick */}
+          <div
+            ref={joystickKnobRef}
+            className={cn(
+              "size-11 rounded-full bg-gradient-to-br from-[#00A2E9] to-[#003B5C] shadow-md border-2 border-white pointer-events-none",
+              !isJoystickActive && "transition-transform duration-150 ease-out"
+            )}
+          />
+        </div>
+      )}
+
+      {/* Bottom Floating Area: Maximize Button, Nearby CCTV Badge & Status Legend */}
       <div className="absolute bottom-3 inset-x-3 z-10 flex items-center justify-between gap-2 pointer-events-none">
-        {/* Left: Nearby CCTV Alert */}
-        {nearbyCCTV ? (
-          <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-sky-300/80 shadow-xs flex items-center gap-2 pointer-events-auto animate-in fade-in slide-in-from-bottom-2 duration-150">
-            <span className="size-2 rounded-full bg-[#00A2E9] animate-pulse" />
-            <span className="text-xs text-zinc-500">Kamera Terdekat:</span>
-            <span className="text-xs font-semibold text-zinc-900">
-              {nearbyCCTV.name}
+        {/* Left: Maximize Fullscreen Button + Nearby CCTV Alert */}
+        <div className="flex items-center gap-2 min-w-0 pointer-events-auto">
+          <button
+            type="button"
+            onClick={handleToggleFullscreen}
+            title={isFullscreen ? "Keluar Layar Penuh (Esc)" : "Layar Penuh 3D"}
+            aria-label={isFullscreen ? "Keluar Layar Penuh" : "Layar Penuh 3D"}
+            className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-white/95 backdrop-blur-md border border-zinc-200/80 shadow-xs text-xs font-medium text-zinc-700 hover:text-zinc-900 hover:bg-zinc-50 transition-colors cursor-pointer shrink-0"
+          >
+            {isFullscreen ? (
+              <Minimize2 className="size-4 text-[#00A2E9]" />
+            ) : (
+              <Maximize2 className="size-4 text-[#00A2E9]" />
+            )}
+            <span className="text-[11px] hidden sm:inline">
+              {isFullscreen ? "Keluar" : "Layar Penuh"}
             </span>
-            <span className="text-[10px] font-mono text-zinc-400">
-              ({nearbyCCTV.sn})
-            </span>
-          </div>
-        ) : (
-          <div />
-        )}
+          </button>
+
+          {nearbyCCTV && (
+            <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-sky-300/80 shadow-xs flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-150 truncate">
+              <span className="size-2 rounded-full bg-[#00A2E9] animate-pulse shrink-0" />
+              <span className="text-xs text-zinc-500 hidden sm:inline">Kamera Terdekat:</span>
+              <span className="text-xs font-semibold text-zinc-900 truncate">
+                {nearbyCCTV.name}
+              </span>
+              <span className="text-[10px] font-mono text-zinc-400 hidden md:inline">
+                ({nearbyCCTV.sn})
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* Right: Status Legend */}
-        <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-200/80 shadow-xs flex items-center gap-3 text-[11px] text-zinc-500 pointer-events-auto">
+        <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-200/80 shadow-xs flex items-center gap-3 text-[11px] text-zinc-500 pointer-events-auto shrink-0">
           <span className="flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-[#00A2E9]" />
             Aktif
