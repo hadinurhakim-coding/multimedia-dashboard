@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Maximize2,
   Minimize2,
+  Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -323,9 +324,11 @@ export function CCTV3DLocator({
   const dragMovedDistRef = useRef<number>(0);
   const nearbyCCTVRef = useRef<string | null>(null);
 
-  // Fullscreen & Mobile Touch Joystick State/Refs
+  // Fullscreen, First-Person Eye POV & Mobile Touch Joystick State/Refs
   const [isFullscreen, setIsFullscreen] = useState(false);
   const wasNativeFullscreenRef = useRef<boolean>(false);
+  const [isFirstPerson, setIsFirstPerson] = useState(false);
+  const isFirstPersonRef = useRef<boolean>(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isJoystickActive, setIsJoystickActive] = useState(false);
   const joystickVecRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -358,6 +361,24 @@ export function CCTV3DLocator({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Sync First-Person Eye POV mode seamlessly without rebuilding Three.js scene
+  useEffect(() => {
+    isFirstPersonRef.current = isFirstPerson;
+    if (characterGroupRef.current) {
+      characterGroupRef.current.visible = !isFirstPerson;
+    }
+    if (isFirstPerson) {
+      pitchRef.current = 0;
+    } else {
+      pitchRef.current = Math.max(-0.35, Math.min(1.15, pitchRef.current));
+    }
+    const cam = cameraRef.current;
+    if (cam) {
+      cam.fov = isFirstPerson ? 62 : 45;
+      cam.updateProjectionMatrix();
+    }
+  }, [isFirstPerson]);
 
   // Detect mobile / touch device only (never render virtual joystick on desktop)
   useEffect(() => {
@@ -466,7 +487,7 @@ export function CCTV3DLocator({
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -535,9 +556,14 @@ export function CCTV3DLocator({
 
     const handleClick = (event: MouseEvent) => {
       if (dragMovedDistRef.current > 6) return;
-      const rect = renderer.domElement.getBoundingClientRect();
-      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      if (document.pointerLockElement === renderer.domElement) {
+        mouse.x = 0;
+        mouse.y = 0;
+      } else {
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      }
 
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(markersGroup.children, true);
@@ -586,14 +612,17 @@ export function CCTV3DLocator({
     };
 
     const onPointerMove = (e: PointerEvent) => {
+      const minPitch = isFirstPersonRef.current ? -1.1 : -0.35;
+      const maxPitch = isFirstPersonRef.current ? 1.1 : 1.15;
+
       if (e.pointerType === "mouse") {
         const isLocked = document.pointerLockElement === domEl;
         if (isLocked) {
           const sens = 0.0026;
           yawRef.current -= e.movementX * sens;
           pitchRef.current = Math.max(
-            -0.35,
-            Math.min(1.15, pitchRef.current + e.movementY * sens)
+            minPitch,
+            Math.min(maxPitch, pitchRef.current + e.movementY * sens)
           );
         } else if (isDraggingRef.current) {
           const sens = 0.0035;
@@ -604,8 +633,8 @@ export function CCTV3DLocator({
 
           yawRef.current -= dx * sens;
           pitchRef.current = Math.max(
-            -0.35,
-            Math.min(1.15, pitchRef.current + dy * sens)
+            minPitch,
+            Math.min(maxPitch, pitchRef.current + dy * sens)
           );
         }
         return;
@@ -622,10 +651,10 @@ export function CCTV3DLocator({
         const touchSens = 0.0048;
         yawRef.current -= dx * touchSens;
         pitchRef.current = Math.max(
-          -0.35,
-          Math.min(1.15, pitchRef.current + dy * touchSens)
+          minPitch,
+          Math.min(maxPitch, pitchRef.current + dy * touchSens)
         );
-      } else if (activeTouchPointers.size === 2) {
+      } else if (activeTouchPointers.size === 2 && !isFirstPersonRef.current) {
         const nextPinch = getPinchDist();
         if (nextPinch !== null && prevPinchDist !== null) {
           const deltaPinch = nextPinch - prevPinchDist;
@@ -649,6 +678,7 @@ export function CCTV3DLocator({
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      if (isFirstPersonRef.current) return;
       camDistRef.current = Math.max(
         1.2,
         Math.min(7.5, camDistRef.current + e.deltaY * 0.003)
@@ -661,7 +691,7 @@ export function CCTV3DLocator({
     window.addEventListener("pointercancel", onPointerUp);
     domEl.addEventListener("wheel", onWheel, { passive: false });
 
-    // 10. Keyboard Controls for Movement (WASD + Shift)
+    // 10. Keyboard Controls for Movement (WASD + Shift + R Reset + V Eye POV)
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (document.activeElement?.tagName || "").toUpperCase();
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -671,9 +701,16 @@ export function CCTV3DLocator({
       // Quick reset position with Key R
       if (e.code === "KeyR") {
         e.preventDefault();
-        characterPosRef.current.set(0, 0, 7.5);
+        const startZ = selectedLocationId === "auditorium-pln" ? 7.5 : 6.0;
+        characterPosRef.current.set(0, 0, startZ);
         yawRef.current = 0;
-        pitchRef.current = 0.20;
+        pitchRef.current = isFirstPersonRef.current ? 0 : 0.20;
+      }
+
+      // Quick toggle Eye POV with Key V
+      if (e.code === "KeyV" && !e.repeat) {
+        e.preventDefault();
+        setIsFirstPerson((prev) => !prev);
       }
     };
 
@@ -695,14 +732,16 @@ export function CCTV3DLocator({
     });
     resizeObserver.observe(container);
 
-    // 12. Animation Loop with Character Movement & Third-Person Camera Follow
-    const clock = new THREE.Clock();
+    // 12. Animation Loop with Character Movement & Third/First-Person Camera Follow
+    const timer = new THREE.Timer();
+    timer.connect(document);
     let animationFrameId: number;
     let lastProximityCheck = 0;
 
-    const animate = () => {
+    const animate = (timestamp?: number) => {
       animationFrameId = requestAnimationFrame(animate);
-      const delta = Math.min(clock.getDelta(), 0.1);
+      timer.update(timestamp);
+      const delta = Math.min(timer.getDelta(), 0.1);
 
       const charPos = characterPosRef.current;
       const keys = activeKeysRef.current;
@@ -779,26 +818,47 @@ export function CCTV3DLocator({
         charPos.y = 0;
       }
 
-      // Update character mesh position
+      // Update character mesh position & visibility
       if (characterGroupRef.current) {
         characterGroupRef.current.position.copy(charPos);
+        characterGroupRef.current.visible = !isFirstPersonRef.current;
       }
 
-      // Third-Person Camera Positioning
+      // Camera Positioning: First-Person (Eye POV) vs Third-Person Follow
       const pitch = pitchRef.current;
-      const camDist = camDistRef.current;
-      const lookTarget = new THREE.Vector3(charPos.x, charPos.y + 1.45, charPos.z);
+      if (isFirstPersonRef.current) {
+        const eyePos = new THREE.Vector3(charPos.x, charPos.y + 1.66, charPos.z);
+        const lookPitch = -pitch;
+        const lookDir = new THREE.Vector3(
+          -Math.sin(yaw) * Math.cos(lookPitch),
+          Math.sin(lookPitch),
+          -Math.cos(yaw) * Math.cos(lookPitch)
+        );
+        camera.position.lerp(eyePos, 0.45);
+        camera.lookAt(
+          eyePos.x + lookDir.x * 10,
+          eyePos.y + lookDir.y * 10,
+          eyePos.z + lookDir.z * 10
+        );
+      } else {
+        const camDist = camDistRef.current;
+        const lookTarget = new THREE.Vector3(
+          charPos.x,
+          charPos.y + 1.45,
+          charPos.z
+        );
 
-      const horizDist = camDist * Math.cos(pitch);
-      const vertDist = camDist * Math.sin(pitch);
-      const idealCamPos = new THREE.Vector3(
-        charPos.x + Math.sin(yaw) * horizDist,
-        charPos.y + 1.45 + vertDist,
-        charPos.z + Math.cos(yaw) * horizDist
-      );
+        const horizDist = camDist * Math.cos(pitch);
+        const vertDist = camDist * Math.sin(pitch);
+        const idealCamPos = new THREE.Vector3(
+          charPos.x + Math.sin(yaw) * horizDist,
+          charPos.y + 1.45 + vertDist,
+          charPos.z + Math.cos(yaw) * horizDist
+        );
 
-      camera.position.lerp(idealCamPos, 0.22);
-      camera.lookAt(lookTarget);
+        camera.position.lerp(idealCamPos, 0.22);
+        camera.lookAt(lookTarget);
+      }
 
       // Periodic proximity check to CCTV cameras (every ~250ms)
       const now = performance.now();
@@ -838,6 +898,7 @@ export function CCTV3DLocator({
       domEl.removeEventListener("wheel", onWheel);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      timer.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
@@ -900,22 +961,33 @@ export function CCTV3DLocator({
     const unit = cctvList.find((c) => c.id === selectedCCTVId);
     if (!unit) return;
 
-    const [cx, , cz] = unit.position3D;
+    const [cx, cy, cz] = unit.position3D;
     const standZ = cz < -4 ? -3.5 : Math.min(12, cz + 2.5);
     const standX = Math.max(-10, Math.min(10, cx * 0.75));
-    characterPosRef.current.set(standX, cz < -4 ? 0.675 : 0, standZ);
+    const standY = cz < -4 ? 0.675 : 0;
+    characterPosRef.current.set(standX, standY, standZ);
 
     yawRef.current = Math.atan2(standX - cx, standZ - cz);
-    pitchRef.current = 0.25;
+    if (isFirstPersonRef.current) {
+      const horizDist = Math.hypot(cx - standX, cz - standZ);
+      const dy = cy - (standY + 1.66);
+      pitchRef.current = Math.max(-1.1, Math.min(1.1, -Math.atan2(dy, horizDist)));
+    } else {
+      pitchRef.current = 0.25;
+    }
   }, [selectedCCTVId, cctvList]);
 
   const handleResetCharacter = useCallback(() => {
     const startZ = selectedLocationId === "auditorium-pln" ? 7.5 : 6.0;
     characterPosRef.current.set(0, 0, startZ);
     yawRef.current = 0;
-    pitchRef.current = 0.20;
+    pitchRef.current = isFirstPersonRef.current ? 0 : 0.20;
     camDistRef.current = 3.4;
   }, [selectedLocationId]);
+
+  const handleToggleFirstPerson = useCallback(() => {
+    setIsFirstPerson((prev) => !prev);
+  }, []);
 
   const handleToggleFullscreen = useCallback(() => {
     if (!isFullscreen) {
@@ -1169,6 +1241,33 @@ export function CCTV3DLocator({
 
           <button
             type="button"
+            onClick={handleToggleFirstPerson}
+            title={
+              isFirstPerson
+                ? "Kembali ke Pandangan Karakter Penuh (V)"
+                : "Lihat Langsung dari Mata Karakter / First-Person POV (V)"
+            }
+            aria-pressed={isFirstPerson}
+            className={cn(
+              "flex items-center gap-1 px-2.5 py-1.5 rounded-lg backdrop-blur-md border shadow-xs text-xs font-medium transition-colors cursor-pointer",
+              isFirstPerson
+                ? "bg-[#00A2E9] border-[#00A2E9] text-white hover:bg-[#0090D1]"
+                : "bg-white/95 border-zinc-200/80 text-zinc-700 hover:text-zinc-900 hover:bg-zinc-50"
+            )}
+          >
+            <Eye
+              className={cn(
+                "size-3.5",
+                isFirstPerson ? "text-white" : "text-[#00A2E9]"
+              )}
+            />
+            <span className="text-[11px] hidden sm:inline">
+              {isFirstPerson ? "POV Mata (V)" : "POV Mata (V)"}
+            </span>
+          </button>
+
+          <button
+            type="button"
             onClick={handleResetCharacter}
             title="Reset Posisi Karakter ke Tengah Ruangan (R)"
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/95 backdrop-blur-md border border-zinc-200/80 shadow-xs text-xs font-medium text-zinc-700 hover:text-zinc-900 hover:bg-zinc-50 transition-colors cursor-pointer"
@@ -1178,6 +1277,16 @@ export function CCTV3DLocator({
           </button>
         </div>
       </div>
+
+      {/* Center Eye POV Reticle */}
+      {isFirstPerson && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
+        >
+          <span className="size-2 rounded-full bg-[#00A2E9]/90 ring-2 ring-white/90 shadow-xs" />
+        </div>
+      )}
 
       {/* Mobile-Only Virtual Joystick (Left Thumb Movement) */}
       {isMobileDevice && (
