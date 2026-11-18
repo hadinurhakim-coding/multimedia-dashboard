@@ -6,6 +6,7 @@ export type AnchoredDocumentationLayout = {
   documentationRows: number;
   signDate: string;
   anchors: readonly (readonly string[])[];
+  requireLocation?: boolean;
 };
 
 // Coordinates only. Project, material, location and signatory values remain private.
@@ -57,7 +58,7 @@ export function buildAnchoredDocumentationForm(
         id: `${id}-location`,
         label: "Lokasi pemasangan",
         kind: "text",
-        required: true,
+        required: layout.requireLocation ?? true,
         targets: [target(documentation.name, `C${row}`)],
       },
     ];

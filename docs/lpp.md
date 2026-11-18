@@ -95,6 +95,12 @@ an upload replaces only the selected photo. The header date updates both A10
 cells and the sign-off date in C27. Non-picture shape annotations (`oneCellAnchor`
 without images) and print settings are preserved untouched.
 
+`LPP_SOC_TEMPLATE_ID` selects the 24-material SOC videowall layout: 49 report
+rows, 37 documentation rows, and 24 materials with 25 photos. Material 10 has two
+picture slots sharing a cell, isolated by drawing ID. The header date updates
+both A10 cells and the sign-off date in D39. Rows with blank installation
+location remain exportable, and non-picture shape annotations remain untouched.
+
 Only copies placed directly in the private `data-lpp/` directory appear in the
 catalog; the nested template archive stays hidden. Provision the chosen original
 there without changing its bytes, then set its filename SHA-256 in the server
