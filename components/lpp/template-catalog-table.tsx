@@ -42,7 +42,7 @@ export function TemplateCatalogTable({
   busy: boolean;
   openingTemplateId: string | null;
   onSelect: (templateId: string) => void;
-  onOpenDrafts: () => void;
+  onOpenDrafts: (folderId?: string) => void;
 }) {
   const [query, setQuery] = React.useState("");
   const [formatFilter, setFormatFilter] = React.useState<"all" | TemplateFormatKind>("all");
@@ -192,7 +192,7 @@ export function TemplateCatalogTable({
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={onOpenDrafts}
+                        onClick={() => onOpenDrafts(row.id)}
                         className="inline-flex items-center gap-1 rounded-sm font-medium text-pln-navy hover:underline focus-visible:outline-2 focus-visible:outline-pln-cyan disabled:opacity-50"
                       >
                         <FolderOpen className="size-3.5 text-pln-cyan" aria-hidden="true" />

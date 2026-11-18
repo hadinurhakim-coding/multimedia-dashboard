@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils";
 import { CCTVActivationView } from "@/components/cctv/cctv-activation-view";
 import { EventView, EventSubmenuTab } from "@/components/event/event-view";
 import { LppView } from "@/components/lpp/lpp-view";
+import { clearLppNavigationState } from "@/lib/lpp/view-state";
 import { useSidebarPreferences } from "@/hooks/use-sidebar-preferences";
 
 export default function DashboardShell7Page() {
@@ -75,6 +76,7 @@ export default function DashboardShell7Page() {
     try {
       const result = await authClient.signOut();
       if (result.error) throw new Error();
+      clearLppNavigationState(user.id);
       window.location.replace("/");
     } catch {
       setSignOutError("Gagal keluar. Silakan coba kembali.");
@@ -84,6 +86,7 @@ export default function DashboardShell7Page() {
   function setActiveTab(tab: typeof activeTab) {
     if (activeTab === "lpp" && tab !== "lpp" && lppDirty && !window.confirm("Perubahan LPP belum disimpan. Tinggalkan halaman?")) return;
     if (tab !== "lpp") setLppDirty(false);
+    if (tab === "lpp") setPreference("reportsOpen", true);
     setPreference("activeTab", tab);
   }
   const setEventSubTab = (tab: EventSubmenuTab) => setPreference("eventSubTab", tab);

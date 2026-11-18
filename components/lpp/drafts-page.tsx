@@ -78,6 +78,10 @@ export function DraftsPage({
   drafts,
   templates,
   busy,
+  folderId,
+  onFolderChange,
+  monthFilter: controlledMonthFilter,
+  onMonthFilterChange,
   onBack,
   onOpen,
   onExport,
@@ -86,13 +90,27 @@ export function DraftsPage({
   drafts: DraftSummary[];
   templates: LppTemplate[];
   busy: boolean;
+  folderId?: string | null;
+  onFolderChange?: (folderId: string | null) => void;
+  monthFilter?: string;
+  onMonthFilterChange?: (monthKey: string) => void;
   onBack: () => void;
   onOpen: (draft: DraftSummary) => void;
   onExport: (draft: DraftSummary) => void;
   onDelete: (draft: DraftSummary) => void;
 }) {
-  const [selectedFolderId, setSelectedFolderId] = React.useState<string | null>(null);
-  const [monthFilter, setMonthFilter] = React.useState<string>("all");
+  const [internalFolderId, setInternalFolderId] = React.useState<string | null>(null);
+  const [internalMonthFilter, setInternalMonthFilter] = React.useState<string>("all");
+  const selectedFolderId = folderId !== undefined ? folderId : internalFolderId;
+  const setSelectedFolderId = (next: string | null) => {
+    if (onFolderChange) onFolderChange(next);
+    else setInternalFolderId(next);
+  };
+  const monthFilter = controlledMonthFilter !== undefined ? controlledMonthFilter : internalMonthFilter;
+  const setMonthFilter = (next: string) => {
+    if (onMonthFilterChange) onMonthFilterChange(next);
+    else setInternalMonthFilter(next);
+  };
   const [searchQuery, setSearchQuery] = React.useState("");
   const [folderView, setFolderView] = useStoredViewMode(FOLDER_VIEW_KEY, DEFAULT_FOLDER_VIEW_MODE);
   const [fileView, setFileView] = useStoredViewMode(FILE_VIEW_KEY, DEFAULT_FILE_VIEW_MODE);
