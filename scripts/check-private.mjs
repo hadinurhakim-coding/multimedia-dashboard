@@ -3,16 +3,60 @@ import { readdir, readFile, lstat } from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 
-const tracked = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" }).split("\0").filter(Boolean);
-const prohibited = tracked.filter((file) =>
-  /(^|\/)(private|\.vercel)(\/|$)/i.test(file) ||
-  (/(^|\/)\.env($|\.)/i.test(file) && !/(^|\/)\.env(\.[^/]+)?\.example$/i.test(file)) ||
-  /\.(xlsx|xlsm|xls|csv|pem|key|p12|pfx|secret|secrets|credential|credentials)$/i.test(file)
-);
-if (prohibited.length) throw new Error(`Prohibited private/secret files are tracked by Git: ${prohibited.join(", ")}. Remove them from the index before publishing.`);
-for (const probe of ["private/privacy-check.xlsx", ".env.local"]) {
-  const ignored = execFileSync("git", ["check-ignore", probe], { encoding: "utf8" }).trim();
-  if (!ignored) throw new Error(`${probe} must be ignored by Git.`);
+const PROHIBITED_EXTENSIONS = /\.(xlsx|xlsm|xls|csv|pem|key|p12|pfx|secret|secrets|credential|credentials)$/i;
+const IGNORED_WORKTREE_ROOTS = new Set([".git", ".next", ".vercel", "node_modules"]);
+
+const toPosix = (file) => file.split(path.sep).join("/");
+
+function isProhibitedFile(file, { includeVercelDir = true } = {}) {
+  const rel = toPosix(file);
+  if (/(^|\/)private(\/|$)/i.test(rel)) return true;
+  if (includeVercelDir && /(^|\/)\.vercel(\/|$)/i.test(rel)) return true;
+  if (/(^|\/)\.env($|\.)/i.test(rel) && !/(^|\/)\.env(\.[^/]+)?\.example$/i.test(rel)) return true;
+  return PROHIBITED_EXTENSIONS.test(rel);
+}
+
+function isGitWorkTree() {
+  try {
+    return execFileSync("git", ["rev-parse", "--is-inside-work-tree"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim() === "true";
+  } catch (error) {
+    const detail = `${error?.stderr ?? ""}${error?.message ?? ""}`;
+    if (error?.code === "ENOENT" || /not a git repository/i.test(detail)) return false;
+    throw error;
+  }
+}
+
+async function walkWorktree(dir = ".") {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const result = [];
+  for (const item of entries) {
+    const file = dir === "." ? item.name : path.join(dir, item.name);
+    const rel = toPosix(file);
+    if (dir === "." && IGNORED_WORKTREE_ROOTS.has(item.name) || item.name === "node_modules") continue;
+    if (item.isSymbolicLink()) throw new Error("Symlinks are forbidden in published assets and private templates.");
+    if (item.isDirectory()) {
+      if (/(^|\/)private(\/|$)/i.test(rel)) { result.push(rel); continue; }
+      result.push(...await walkWorktree(file));
+    } else {
+      result.push(rel);
+    }
+  }
+  return result;
+}
+
+if (isGitWorkTree()) {
+  const tracked = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" }).split("\0").filter(Boolean);
+  const prohibited = tracked.filter((file) => isProhibitedFile(file));
+  if (prohibited.length) throw new Error(`Prohibited private/secret files are tracked by Git: ${prohibited.join(", ")}. Remove them from the index before publishing.`);
+  for (const probe of ["private/privacy-check.xlsx", ".env.local"]) {
+    const ignored = execFileSync("git", ["check-ignore", probe], { encoding: "utf8" }).trim();
+    if (!ignored) throw new Error(`${probe} must be ignored by Git.`);
+  }
+} else {
+  // Build environments such as Vercel strip .git/, so audit the uploaded working tree directly.
+  const files = await walkWorktree(".");
+  const prohibited = files.filter((file) => isProhibitedFile(file, { includeVercelDir: false }));
+  if (prohibited.length) throw new Error(`Prohibited private/secret files are present in build context: ${prohibited.join(", ")}. Exclude them before building.`);
 }
 async function walk(dir) {
   let items; try { items = await readdir(dir, { withFileTypes: true }); } catch (e) { if (e.code === "ENOENT") return []; throw e; }
