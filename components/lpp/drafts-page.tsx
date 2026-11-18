@@ -4,27 +4,75 @@ import * as React from "react";
 import {
   ArrowLeft,
   ChevronRight,
-  Download,
   FileSpreadsheet,
   Folder,
   FolderOpen,
   Search,
-  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DraftViewMenu } from "@/components/lpp/draft-view-menu";
+import { FolderCollectionView, FolderFilesView } from "@/components/lpp/draft-browser-views";
 import {
   buildDraftFolders,
-  draftDisplayTitle,
-  draftExportLabel,
+  DEFAULT_FILE_VIEW_MODE,
+  DEFAULT_FOLDER_VIEW_MODE,
   filterFolderDrafts,
+  isDraftViewMode,
   type DraftFolder,
   type DraftSummary,
+  type DraftViewMode,
 } from "@/lib/lpp/draft-folders";
-import { formatReportDate, resolveReportDate } from "@/lib/lpp/report-date";
+import { resolveReportDate } from "@/lib/lpp/report-date";
 import { cn } from "@/lib/utils";
 import type { LppTemplate } from "@/types/lpp";
+
+const FOLDER_VIEW_KEY = "lpp-drafts-folder-view";
+const FILE_VIEW_KEY = "lpp-drafts-file-view";
+
+function useStoredViewMode(
+  key: string,
+  fallback: DraftViewMode
+): [DraftViewMode, (next: DraftViewMode) => void] {
+  const [memoryMode, setMemoryMode] = React.useState<DraftViewMode | null>(null);
+  const subscribe = React.useCallback(
+    (listener: () => void) => {
+      const onStorage = (event: StorageEvent) => {
+        if (event.key === key) listener();
+      };
+      const eventName = `lpp-view:${key}`;
+      window.addEventListener("storage", onStorage);
+      window.addEventListener(eventName, listener);
+      return () => {
+        window.removeEventListener("storage", onStorage);
+        window.removeEventListener(eventName, listener);
+      };
+    },
+    [key]
+  );
+  const storedMode = React.useSyncExternalStore(
+    subscribe,
+    () => {
+      try {
+        const value = window.localStorage.getItem(key);
+        return isDraftViewMode(value) ? value : fallback;
+      } catch {
+        return fallback;
+      }
+    },
+    () => fallback
+  );
+  const setMode = (next: DraftViewMode) => {
+    setMemoryMode(next);
+    try {
+      window.localStorage.setItem(key, next);
+      window.dispatchEvent(new Event(`lpp-view:${key}`));
+    } catch {
+      // Fall back to in-memory state when localStorage is blocked.
+    }
+  };
+  return [memoryMode ?? storedMode, setMode];
+}
 
 export function DraftsPage({
   drafts,
@@ -46,6 +94,8 @@ export function DraftsPage({
   const [selectedFolderId, setSelectedFolderId] = React.useState<string | null>(null);
   const [monthFilter, setMonthFilter] = React.useState<string>("all");
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [folderView, setFolderView] = useStoredViewMode(FOLDER_VIEW_KEY, DEFAULT_FOLDER_VIEW_MODE);
+  const [fileView, setFileView] = useStoredViewMode(FILE_VIEW_KEY, DEFAULT_FILE_VIEW_MODE);
 
   const folders = React.useMemo(
     () => buildDraftFolders(drafts, templates),
@@ -56,6 +106,11 @@ export function DraftsPage({
     () => folders.find((folder) => folder.id === selectedFolderId) ?? null,
     [folders, selectedFolderId]
   );
+
+  function updateViewMode(nextMode: DraftViewMode) {
+    if (activeFolder) setFileView(nextMode);
+    else setFolderView(nextMode);
+  }
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -156,11 +211,19 @@ export function DraftsPage({
             )}
           </nav>
 
-          <span className="text-sm text-zinc-500">
-            {activeFolder
-              ? `${visibleFolderDrafts.length} file`
-              : `${folders.length} folder · ${drafts.length} draf`}
-          </span>
+          <div className="flex flex-wrap items-center justify-end gap-2.5">
+            <DraftViewMenu
+              value={activeFolder ? fileView : folderView}
+              disabled={busy}
+              onChange={updateViewMode}
+            />
+            <span className="hidden h-4 w-px bg-zinc-200 sm:inline-block" aria-hidden="true" />
+            <span className="text-sm text-zinc-500">
+              {activeFolder
+                ? `${visibleFolderDrafts.length} file`
+                : `${folders.length} folder · ${drafts.length} draf`}
+            </span>
+          </div>
         </div>
 
         {!drafts.length ? (
@@ -186,6 +249,13 @@ export function DraftsPage({
               <p className="font-medium text-pln-charcoal">Folder atau laporan tidak ditemukan</p>
               <p className="text-sm text-zinc-500">Coba kata kunci lain atau bersihkan pencarian.</p>
             </div>
+          ) : folderView === "details" ? (
+            <FolderCollectionView
+              folders={visibleFolders}
+              viewMode={folderView}
+              busy={busy}
+              onOpenFolder={openFolder}
+            />
           ) : (
             <div className="space-y-4 p-5">
               <div className="flex items-center justify-between">
@@ -194,49 +264,12 @@ export function DraftsPage({
                 </h2>
                 <span className="text-xs text-zinc-400">Klik folder untuk membuka file di dalamnya</span>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {visibleFolders.map((folder) => (
-                  <button
-                    key={folder.id}
-                    type="button"
-                    disabled={busy}
-                    onClick={() => openFolder(folder)}
-                    className="group flex items-start gap-3.5 rounded-xl border border-zinc-200 bg-white p-4 text-left transition hover:border-pln-cyan hover:bg-pln-ice/50 focus-visible:outline-2 focus-visible:outline-pln-cyan disabled:opacity-50"
-                  >
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-pln-cyan/10 text-pln-navy transition-colors group-hover:bg-pln-cyan/20">
-                      <Folder className="size-5 fill-pln-cyan/25 text-pln-navy" />
-                    </div>
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="truncate font-semibold text-pln-navy group-hover:underline">
-                          {folder.name}
-                        </p>
-                        <ChevronRight className="size-4 shrink-0 text-zinc-400 transition-transform group-hover:translate-x-0.5 group-hover:text-pln-navy" />
-                      </div>
-                      <p className="text-xs text-zinc-500">
-                        {folder.drafts.length} file · Terbaru {formatReportDate(folder.latestReportDate)}
-                      </p>
-                      {folder.months.length > 0 && (
-                        <div className="flex flex-wrap gap-1 pt-1">
-                          {folder.months.slice(0, 3).map((month) => (
-                            <span
-                              key={month.key}
-                              className="inline-flex items-center rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600"
-                            >
-                              {month.label}
-                            </span>
-                          ))}
-                          {folder.months.length > 3 && (
-                            <span className="inline-flex items-center rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-500">
-                              +{folder.months.length - 3}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
+              <FolderCollectionView
+                folders={visibleFolders}
+                viewMode={folderView}
+                busy={busy}
+                onOpenFolder={openFolder}
+              />
             </div>
           )
         ) : (
@@ -289,82 +322,15 @@ export function DraftsPage({
                 <p className="text-sm text-zinc-500">Ubah filter bulan atau kata kunci pencarian.</p>
               </div>
             ) : (
-              <Table aria-label={`Daftar file di folder ${activeFolder.name}`}>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="pl-5">Nama file</TableHead>
-                    <TableHead>Tanggal laporan</TableHead>
-                    <TableHead>Ringkasan</TableHead>
-                    <TableHead className="pr-5 text-right">Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visibleFolderDrafts.map((draft) => {
-                    const templateName = activeFolder.available ? activeFolder.name : undefined;
-                    const title = draftDisplayTitle(draft, templateName);
-                    const exportName = draftExportLabel(draft, templateName);
-                    const date = resolveReportDate(draft);
-                    return (
-                      <TableRow key={draft.id}>
-                        <TableCell className="pl-5">
-                          <button
-                            disabled={busy}
-                            onClick={() => onOpen(draft)}
-                            className="flex w-full max-w-md flex-col items-start gap-0.5 rounded-sm text-left focus-visible:outline-2 focus-visible:outline-pln-cyan disabled:opacity-50"
-                          >
-                            <span className="flex w-full min-w-0 items-center gap-2 font-medium text-pln-navy hover:underline">
-                              <FileSpreadsheet className="size-4 shrink-0 text-pln-cyan" />
-                              <span className="truncate">{title}</span>
-                            </span>
-                            <span className="w-full truncate pl-6 text-xs text-zinc-500">
-                              {exportName}
-                            </span>
-                          </button>
-                        </TableCell>
-                        <TableCell>
-                          <time dateTime={date}>{formatReportDate(date)}</time>
-                        </TableCell>
-                        <TableCell className="text-xs text-zinc-500">
-                          {draft.changes ?? 0} sel · {draft.photoCount ?? Object.keys(draft.photos ?? {}).length} foto
-                        </TableCell>
-                        <TableCell className="pr-5">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={busy}
-                              aria-label={`Buka ${title}, ${formatReportDate(date)}`}
-                              onClick={() => onOpen(draft)}
-                            >
-                              Buka
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-pln-navy"
-                              disabled={busy || !activeFolder.available}
-                              aria-label={`Ekspor Excel ${title}, ${formatReportDate(date)}`}
-                              onClick={() => onExport(draft)}
-                            >
-                              <Download className="size-3.5" />
-                              Ekspor Excel
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled={busy}
-                              aria-label={`Hapus ${title}, ${formatReportDate(date)}`}
-                              onClick={() => onDelete(draft)}
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              <FolderFilesView
+                folder={activeFolder}
+                drafts={visibleFolderDrafts}
+                viewMode={fileView}
+                busy={busy}
+                onOpen={onOpen}
+                onExport={onExport}
+                onDelete={onDelete}
+              />
             )}
           </div>
         )}

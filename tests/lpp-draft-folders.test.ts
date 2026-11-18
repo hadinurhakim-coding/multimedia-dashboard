@@ -2,9 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildDraftFolders,
+  DRAFT_VIEW_OPTIONS,
   draftDisplayTitle,
   draftExportLabel,
   filterFolderDrafts,
+  formatDraftUpdatedAt,
+  isDraftViewMode,
   type DraftSummary,
 } from "../lib/lpp/draft-folders";
 import type { LppTemplate } from "../types/lpp";
@@ -115,4 +118,19 @@ test("Drafts inside a folder filter accurately by month and search query", () =>
     filterFolderDrafts(folder.drafts, folder.name, { query: "2026-11-18" }).map((d) => d.id),
     ["d1"]
   );
+  assert.equal(folder.totalChanges, 4);
+  assert.equal(folder.totalPhotos, 2);
+});
+
+test("Draft folder view options and timestamps validate cleanly", () => {
+  assert.equal(DRAFT_VIEW_OPTIONS.length, 8);
+  assert.deepEqual(
+    DRAFT_VIEW_OPTIONS.map((option) => option.id),
+    ["extra-large", "large", "medium", "small", "list", "details", "tiles", "content"]
+  );
+  assert.equal(isDraftViewMode("details"), true);
+  assert.equal(isDraftViewMode("tiles"), true);
+  assert.equal(isDraftViewMode("unknown"), false);
+  assert.match(formatDraftUpdatedAt("2026-11-18T07:00:00Z"), /2026.*WIB$/);
+  assert.equal(formatDraftUpdatedAt("invalid"), "—");
 });

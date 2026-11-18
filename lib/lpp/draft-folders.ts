@@ -20,7 +20,62 @@ export type DraftFolder = {
   months: DraftMonthOption[];
   latestReportDate: string;
   latestUpdatedAt: string;
+  totalChanges: number;
+  totalPhotos: number;
 };
+
+export type DraftViewMode =
+  | "extra-large"
+  | "large"
+  | "medium"
+  | "small"
+  | "list"
+  | "details"
+  | "tiles"
+  | "content";
+
+export type DraftViewOption = {
+  id: DraftViewMode;
+  label: string;
+  description: string;
+};
+
+export const DEFAULT_FOLDER_VIEW_MODE: DraftViewMode = "tiles";
+export const DEFAULT_FILE_VIEW_MODE: DraftViewMode = "details";
+
+export const DRAFT_VIEW_OPTIONS: readonly DraftViewOption[] = [
+  { id: "extra-large", label: "Ikon ekstra besar", description: "Kartu besar dengan rincian lengkap" },
+  { id: "large", label: "Ikon besar", description: "Ikon menonjol dan nama lengkap" },
+  { id: "medium", label: "Ikon sedang", description: "Grid seimbang 4–5 kolom" },
+  { id: "small", label: "Ikon kecil", description: "Tampilan ringkas banyak item" },
+  { id: "list", label: "Daftar", description: "Baris tipis satu baris per item" },
+  { id: "details", label: "Detail", description: "Tabel kolom lengkap & waktu simpan" },
+  { id: "tiles", label: "Ubin", description: "Kartu informatif dengan badge bulan" },
+  { id: "content", label: "Konten", description: "Baris detail dengan ringkasan penuh" },
+];
+
+const VIEW_MODE_SET = new Set<string>(DRAFT_VIEW_OPTIONS.map((option) => option.id));
+
+/** Type guard validating persisted or selected draft view modes. */
+export function isDraftViewMode(value: unknown): value is DraftViewMode {
+  return typeof value === "string" && VIEW_MODE_SET.has(value);
+}
+
+const UPDATED_AT_FORMATTER = new Intl.DateTimeFormat("id-ID", {
+  timeZone: "Asia/Jakarta",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** Formats a draft's ISO updatedAt timestamp in Asia/Jakarta (WIB). */
+export function formatDraftUpdatedAt(isoTimestamp: string): string {
+  const date = new Date(isoTimestamp);
+  if (Number.isNaN(date.valueOf())) return "—";
+  return `${UPDATED_AT_FORMATTER.format(date)} WIB`;
+}
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat("id-ID", {
   timeZone: "UTC",
@@ -78,12 +133,16 @@ export function buildDraftFolders(
     const monthMap = new Map<string, string>();
     let latestReportDate = "";
     let latestUpdatedAt = "";
+    let totalChanges = 0;
+    let totalPhotos = 0;
     for (const item of sorted) {
       const date = resolveReportDate(item);
       const month = reportMonthOf(date);
       if (!monthMap.has(month.key)) monthMap.set(month.key, month.label);
       if (!latestReportDate || date > latestReportDate) latestReportDate = date;
       if (!latestUpdatedAt || item.updatedAt > latestUpdatedAt) latestUpdatedAt = item.updatedAt;
+      totalChanges += item.changes ?? 0;
+      totalPhotos += item.photoCount ?? Object.keys(item.photos ?? {}).length;
     }
 
     const months = [...monthMap.entries()]
@@ -98,6 +157,8 @@ export function buildDraftFolders(
       months,
       latestReportDate,
       latestUpdatedAt,
+      totalChanges,
+      totalPhotos,
     });
   }
 
