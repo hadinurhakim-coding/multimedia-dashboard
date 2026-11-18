@@ -21,13 +21,19 @@ import {
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth/client";
 import { useAppUser } from "@/components/auth/session-boundary";
 import {
   Home,
   Calendar,
   Zap,
-  ChevronRight,
   ChevronDown,
   Search,
   Share2,
@@ -55,6 +61,26 @@ export default function DashboardShell7Page() {
   const [preferences, setPreference] = useSidebarPreferences();
   const { activeTab, eventSubTab, eventOpen: isEventSubmenuOpen } = preferences;
   const [lppDirty, setLppDirty] = React.useState(false);
+  const userInitials = user.name
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "PG";
+  async function handleSignOut() {
+    if (lppDirty && !window.confirm("Perubahan LPP belum disimpan. Keluar dari aplikasi?")) return;
+    setSigningOut(true);
+    setSignOutError("");
+    try {
+      const result = await authClient.signOut();
+      if (result.error) throw new Error();
+      window.location.replace("/");
+    } catch {
+      setSignOutError("Gagal keluar. Silakan coba kembali.");
+      setSigningOut(false);
+    }
+  }
   function setActiveTab(tab: typeof activeTab) {
     if (activeTab === "lpp" && tab !== "lpp" && lppDirty && !window.confirm("Perubahan LPP belum disimpan. Tinggalkan halaman?")) return;
     if (tab !== "lpp") setLppDirty(false);
@@ -75,36 +101,28 @@ export default function DashboardShell7Page() {
         collapsible="icon"
         className="border-r border-zinc-200/80 bg-[#FAFAFA] text-zinc-800"
       >
-        {/* Workspace Switcher Header with PLN Logo */}
+        {/* Brand Header with PLN Logo */}
         <SidebarHeader className="p-2">
-          <SidebarMenu>
-            <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
-              <SidebarMenuButton
-                size="lg"
-                className="gap-3 hover:bg-zinc-100 text-zinc-900 rounded-xl transition-all group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
-              >
-                <div className="size-8 w-8 h-8 aspect-square rounded-[6px] overflow-hidden flex items-center justify-center shrink-0 shadow-xs bg-[#FFD100]">
-                  <Image
-                    src="/images/pln-logo.png"
-                    alt="Logo PLN Petir"
-                    width={32}
-                    height={32}
-                    className="size-8 w-8 h-8 aspect-square object-contain rounded-[6px]"
-                    priority
-                  />
-                </div>
-                <div className="flex flex-col items-start leading-tight truncate group-data-[collapsible=icon]:hidden">
-                  <span className="text-sm font-semibold text-zinc-900 tracking-tight truncate">
-                    PLN Icon Plus
-                  </span>
-                  <span className="text-xs text-zinc-500 font-normal truncate">
-                    Multimedia Studio
-                  </span>
-                </div>
-                <ChevronRight className="ml-auto size-4 text-zinc-400 group-data-[collapsible=icon]:hidden" />
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
+          <div className="flex h-12 w-full items-center gap-3 overflow-hidden rounded-xl p-2 text-left text-sm text-zinc-900 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0">
+            <div className="size-8 w-8 h-8 aspect-square rounded-[6px] overflow-hidden flex items-center justify-center shrink-0 shadow-xs bg-[#FFD100]">
+              <Image
+                src="/images/pln-logo.png"
+                alt="Logo PLN Petir"
+                width={32}
+                height={32}
+                className="size-8 w-8 h-8 aspect-square object-contain rounded-[6px]"
+                priority
+              />
+            </div>
+            <div className="flex flex-col items-start leading-tight truncate group-data-[collapsible=icon]:hidden">
+              <span className="text-sm font-semibold text-zinc-900 tracking-tight truncate">
+                PLN Icon Plus
+              </span>
+              <span className="text-xs text-zinc-500 font-normal truncate">
+                Multimedia Studio
+              </span>
+            </div>
+          </div>
         </SidebarHeader>
 
         {/* Sidebar Navigation Content */}
@@ -310,17 +328,45 @@ export default function DashboardShell7Page() {
               <Bell className="size-4" />
               <span className="bg-[#00A2E9] absolute top-1.5 right-1.5 size-1.5 rounded-full" />
             </Button>
-            <Avatar className="ml-1 size-8" title={user.email}>
-              <AvatarFallback className="bg-zinc-900 text-white font-bold text-xs">
-                {user.name.split(/\s+/).map(part => part[0]).slice(0, 2).join("").toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <Button variant="outline" size="sm" disabled={signingOut} aria-label="Keluar dari aplikasi" onClick={async () => {
-              if (lppDirty && !window.confirm("Perubahan LPP belum disimpan. Keluar dari aplikasi?")) return;
-              setSigningOut(true); setSignOutError("");
-              try { const result = await authClient.signOut(); if (result.error) throw new Error(); window.location.replace("/"); }
-              catch { setSignOutError("Gagal keluar. Silakan coba kembali."); setSigningOut(false); }
-            }}><LogOut className="size-4" /><span className="hidden sm:inline">{signingOut ? "Keluar…" : "Keluar"}</span></Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                aria-label={`Menu profil ${user.name}`}
+                title={user.email}
+                className="ml-1 rounded-full cursor-pointer outline-hidden ring-offset-background transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-pln-cyan/60 focus-visible:ring-offset-2"
+              >
+                <Avatar className="size-8">
+                  <AvatarFallback className="bg-zinc-900 text-white font-bold text-xs">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={8} className="w-60">
+                <div className="flex items-center gap-2.5 px-2.5 py-2">
+                  <Avatar className="size-8 shrink-0">
+                    <AvatarFallback className="bg-zinc-900 text-white font-bold text-xs">
+                      {userInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-pln-charcoal">
+                      {user.name}
+                    </p>
+                    <p className="truncate text-xs text-zinc-500">
+                      {user.email}
+                    </p>
+                  </div>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={signingOut}
+                  onClick={handleSignOut}
+                >
+                  <LogOut className="size-4" />
+                  <span>{signingOut ? "Keluar…" : "Keluar"}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
         <div aria-hidden="true" className="h-[3.875rem] shrink-0" />

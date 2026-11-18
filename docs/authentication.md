@@ -1,10 +1,11 @@
 # Autentikasi terpusat
 
 Login berada di `/`. Server baru merender dashboard setelah memeriksa sesi Neon
-Auth dan izin akun. LPP memakai sesi yang sama; tombol **Keluar** ada di header
-aplikasi. Sesi diperiksa kembali saat jendela aktif dan setiap 60 detik. Respons
-401 menutup workspace. Pergantian identitas memuat ulang halaman agar state akun
-sebelumnya tidak digunakan kembali. Setiap API tetap memeriksa izin secara mandiri.
+Auth dan izin akun. LPP memakai sesi yang sama; menu **Keluar** ada di dropdown
+profil pada header aplikasi. Sesi diperiksa kembali saat jendela aktif dan setiap
+60 detik. Respons 401 menutup workspace. Pergantian identitas memuat ulang
+halaman agar state akun sebelumnya tidak digunakan kembali. Setiap API tetap
+memeriksa izin secara mandiri.
 
 ## Identitas dan izin
 
