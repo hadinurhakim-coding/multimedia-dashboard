@@ -266,12 +266,12 @@ export function LppView({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => 
         }, "Menghapus draf…");
       }}
     /> : <>
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-white p-4">
-        <label className="min-w-0 flex-1 space-y-1 text-sm"><span>Template laporan</span><select aria-label="Template laporan" className="h-10 w-full rounded-md border bg-white px-3" value={document?.id ?? ""} disabled={busy} onChange={(e) => { if (e.target.value) { setOpeningTemplateId(e.target.value); void run(() => open(e.target.value), "Memuat template…"); } }}><option value="">Pilih template…</option>{catalog.templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.documentationTableAvailable ? " — Tabel dokumentasi" : t.formAvailable ? " — Form input" : ""}</option>)}</select></label>
-        {document && <Button variant="outline" className="h-10" disabled={busy} onClick={closeDocument}><ArrowLeft className="size-4" />Daftar template</Button>}
+      {document && <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-white p-4">
+        <label className="min-w-0 flex-1 space-y-1 text-sm"><span>Template laporan</span><select aria-label="Template laporan" className="h-10 w-full rounded-md border bg-white px-3" value={document.id} disabled={busy} onChange={(e) => { if (e.target.value) { setOpeningTemplateId(e.target.value); void run(() => open(e.target.value), "Memuat template…"); } }}><option value="">Pilih template…</option>{catalog.templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.documentationTableAvailable ? " — Tabel dokumentasi" : t.formAvailable ? " — Form input" : ""}</option>)}</select></label>
+        <Button variant="outline" className="h-10" disabled={busy} onClick={closeDocument}><ArrowLeft className="size-4" />Daftar template</Button>
         <Button variant="outline" className="h-10" disabled={busy} onClick={() => void run(async () => { await refresh(); setScreen("drafts"); setDraftsFolderId(null); setDraftsMonthFilter("all"); persistNav({ screen: "drafts", folderId: null, monthFilter: "all" }); window.scrollTo({ top: 0 }); }, "Memuat draf…")}><FolderOpen className="size-4" />Draf</Button>
         {!catalog.templates.length && <p className="w-full text-sm">Template belum tersedia. Hubungi administrator.</p>}
-      </div>
+      </div>}
       {!document && (
         <TemplateCatalogTable
           templates={catalog.templates}
