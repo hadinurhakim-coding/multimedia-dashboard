@@ -81,9 +81,35 @@ async function readArchive(buffer: Buffer) {
   }
   return { zip, sheets };
 }
-export async function inspectWorkbook(buffer: Buffer): Promise<LppWorkbook> {
-  const { sheets } = await readArchive(buffer);
-  return { hash: createHash("sha256").update(buffer).digest("hex"), sheets: sheets.map((s) => s.model) };
+const MAX_WORKBOOK_CACHE_ENTRIES = 32;
+const workbookCache = new Map<string, LppWorkbook>();
+const inflightWorkbooks = new Map<string, Promise<LppWorkbook>>();
+
+function cacheWorkbook(hash: string, workbook: LppWorkbook) {
+  if (workbookCache.has(hash)) workbookCache.delete(hash);
+  workbookCache.set(hash, workbook);
+  if (workbookCache.size > MAX_WORKBOOK_CACHE_ENTRIES) {
+    const oldest = workbookCache.keys().next().value;
+    if (oldest !== undefined) workbookCache.delete(oldest);
+  }
+}
+
+export async function inspectWorkbook(buffer: Buffer, knownHash?: string): Promise<LppWorkbook> {
+  const hash = knownHash ?? createHash("sha256").update(buffer).digest("hex");
+  const cached = workbookCache.get(hash);
+  if (cached) return cached;
+  const inflight = inflightWorkbooks.get(hash);
+  if (inflight) return inflight;
+
+  const task = (async () => {
+    const { sheets } = await readArchive(buffer);
+    const model: LppWorkbook = { hash, sheets: sheets.map((s) => s.model) };
+    cacheWorkbook(hash, model);
+    return model;
+  })();
+
+  inflightWorkbooks.set(hash, task);
+  try { return await task; } finally { inflightWorkbooks.delete(hash); }
 }
 export function validateEdits(workbook: LppWorkbook, input: unknown): CellEdit[] {
   if (!Array.isArray(input) || input.length > 10000) throw new Error("Perubahan sel tidak valid.");
@@ -112,8 +138,8 @@ function replacementCell(address: string, value: CellValue, original?: string) {
   if (typeof value === "string") return `<c${attrs} t="inlineStr"><is><t xml:space="preserve">${escapeXml(value)}</t></is>${suffix}</c>`;
   return `<c${attrs}${typeof value === "boolean" ? ' t="b"' : ""}><v>${typeof value === "boolean" ? Number(value) : value}</v>${suffix}</c>`;
 }
-export async function exportWorkbook(buffer: Buffer, input: unknown): Promise<Buffer> {
-  const workbook = await inspectWorkbook(buffer);
+export async function exportWorkbook(buffer: Buffer, input: unknown, preinspected?: LppWorkbook): Promise<Buffer> {
+  const workbook = preinspected ?? await inspectWorkbook(buffer);
   const edits = validateEdits(workbook, input);
   if (!edits.length) return buffer; // Exact original bytes when there are no edits.
   const { zip, sheets } = await readArchive(buffer);

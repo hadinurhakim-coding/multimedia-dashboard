@@ -1,11 +1,60 @@
 // Pure image/OOXML processing; called only from authenticated server routes.
+import { createHash } from "node:crypto";
 import JSZip from "jszip";
 import sharp from "sharp";
 import { XMLParser } from "fast-xml-parser";
 import { posix } from "node:path";
+import { mapWithConcurrency } from "@/lib/async";
 import { formPhotoSlots, type LppForm } from "./form";
 import { MAX_PHOTO_BYTES, PHOTO_TYPES } from "./photo-policy";
 import { watermarkPhoto } from "./watermark";
+
+const MAX_ARCHIVE_CACHE_ENTRIES = 8;
+const MAX_ASSET_CACHE_ENTRIES = 240;
+const templateArchiveCache = new Map<string, Promise<JSZip>>();
+const templateSlotCache = new Map<string, Promise<PhotoSlot[]>>();
+const renderedTemplateAssetCache = new Map<string, Promise<Buffer>>();
+
+function setBoundedEntry<V>(cache: Map<string, Promise<V>>, key: string, value: Promise<V>, maxEntries: number) {
+  if (cache.has(key)) cache.delete(key);
+  cache.set(key, value);
+  if (cache.size > maxEntries) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+}
+
+function getOrCachePromise<V>(
+  cache: Map<string, Promise<V>>,
+  key: string,
+  maxEntries: number,
+  factory: () => Promise<V>
+): Promise<V> {
+  const existing = cache.get(key);
+  if (existing) return existing;
+  const promise = factory().catch((error) => {
+    if (cache.get(key) === promise) cache.delete(key);
+    throw error;
+  });
+  setBoundedEntry(cache, key, promise, maxEntries);
+  return promise;
+}
+
+function bufferHash(buffer: Buffer, knownHash?: string) {
+  return knownHash ?? createHash("sha256").update(buffer).digest("hex");
+}
+
+function getTemplateArchive(buffer: Buffer, hash: string) {
+  return getOrCachePromise(templateArchiveCache, hash, MAX_ARCHIVE_CACHE_ENTRIES, () => JSZip.loadAsync(buffer));
+}
+
+function getTemplateSlots(buffer: Buffer, form: LppForm, hash: string) {
+  const formSignature = formPhotoSlots(form).map((s) => `${s.id}:${s.sheet}:${s.row}:${s.column}:${s.anchorId ?? ""}`).join("|");
+  return getOrCachePromise(templateSlotCache, `${hash}:${formSignature}`, MAX_ARCHIVE_CACHE_ENTRIES * 2, async () => {
+    const zip = await getTemplateArchive(buffer, hash);
+    return photoSlots(zip, form);
+  });
+}
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@", removeNSPrefix: true, parseTagValue: false });
 type Node = Record<string, unknown>;
@@ -101,36 +150,48 @@ async function photoSlots(zip: JSZip, form: LppForm): Promise<PhotoSlot[]> {
     return matches[0];
   });
 }
-export async function templatePhoto(buffer: Buffer, form: LppForm, itemId: string, thumbnail = false) {
-  const zip = await JSZip.loadAsync(buffer), slot = (await photoSlots(zip, form)).find((s) => s.itemId === itemId);
-  if (!slot || !slot.media) throw new Error("Foto template tidak ditemukan.");
-  const source = zip.file(slot.media);
-  if (!source) throw new Error("Foto template tidak ditemukan.");
-  // Safe preview, with the same orientation/metadata policy as uploaded photos.
-  return photoPreview(await source.async("nodebuffer"), thumbnail);
+export async function templatePhoto(buffer: Buffer, form: LppForm, itemId: string, thumbnail = false, knownHash?: string) {
+  const hash = bufferHash(buffer, knownHash);
+  return getOrCachePromise(
+    renderedTemplateAssetCache,
+    `${hash}:photo:${itemId}:${thumbnail ? 1 : 0}`,
+    MAX_ASSET_CACHE_ENTRIES,
+    async () => {
+      const zip = await getTemplateArchive(buffer, hash);
+      const slot = (await getTemplateSlots(buffer, form, hash)).find((s) => s.itemId === itemId);
+      if (!slot || !slot.media) throw new Error("Foto template tidak ditemukan.");
+      const source = zip.file(slot.media);
+      if (!source) throw new Error("Foto template tidak ditemukan.");
+      // Safe preview, with the same orientation/metadata policy as uploaded photos.
+      return photoPreview(await source.async("nodebuffer"), thumbnail);
+    }
+  );
 }
 export function photoPreview(buffer: Buffer, thumbnail = false) {
   const size = thumbnail ? 120 : 1000;
   return sharp(buffer, imageOptions).rotate().resize({ width: size, height: size, fit: "inside", withoutEnlargement: true }).flatten({ background: "#ffffff" }).jpeg({ quality: 85 }).toBuffer();
 }
-export async function templateHeaderLogo(buffer: Buffer) {
-  const zip = await JSZip.loadAsync(buffer);
-  const workbook = node(parser.parse(await xml(zip, "xl/workbook.xml")).workbook);
-  const sheet = list(node(workbook.sheets).sheet)[0];
-  const relationships = list(parser.parse(await xml(zip, "xl/_rels/workbook.xml.rels")).Relationships.Relationship);
-  const sheetPath = resolveTarget("xl/workbook.xml", relationships.find((r) => r["@Id"] === sheet?.["@id"]), "xl/worksheets/");
-  const worksheet = node(parser.parse(await xml(zip, sheetPath)).worksheet);
-  const sheetRels = list(parser.parse(await xml(zip, relPath(sheetPath))).Relationships.Relationship);
-  const drawing = resolveTarget(sheetPath, sheetRels.find((r) => r["@Id"] === node(worksheet.drawing)["@id"]), "xl/drawings/");
-  const data = node(parser.parse(await xml(zip, drawing)).wsDr);
-  const candidates = [...list(data.twoCellAnchor), ...list(data.oneCellAnchor)].filter((anchor) => anchor.pic && Number(node(anchor.from).row) === 0 && Number(node(anchor.from).col) === 0);
-  if (candidates.length !== 1) throw new Error("Logo template tidak ditemukan.");
-  const embed = node(node(node(candidates[0].pic).blipFill).blip)["@embed"];
-  const imageRels = list(parser.parse(await xml(zip, relPath(drawing))).Relationships.Relationship);
-  const media = resolveTarget(drawing, imageRels.find((r) => r["@Id"] === embed), "xl/media/");
-  const source = zip.file(media);
-  if (!source) throw new Error("Logo template tidak ditemukan.");
-  return sharp(await source.async("nodebuffer"), imageOptions).resize({ width: 440, height: 140, fit: "inside", withoutEnlargement: true }).png().toBuffer();
+export async function templateHeaderLogo(buffer: Buffer, knownHash?: string) {
+  const hash = bufferHash(buffer, knownHash);
+  return getOrCachePromise(renderedTemplateAssetCache, `${hash}:logo`, MAX_ASSET_CACHE_ENTRIES, async () => {
+    const zip = await getTemplateArchive(buffer, hash);
+    const workbook = node(parser.parse(await xml(zip, "xl/workbook.xml")).workbook);
+    const sheet = list(node(workbook.sheets).sheet)[0];
+    const relationships = list(parser.parse(await xml(zip, "xl/_rels/workbook.xml.rels")).Relationships.Relationship);
+    const sheetPath = resolveTarget("xl/workbook.xml", relationships.find((r) => r["@Id"] === sheet?.["@id"]), "xl/worksheets/");
+    const worksheet = node(parser.parse(await xml(zip, sheetPath)).worksheet);
+    const sheetRels = list(parser.parse(await xml(zip, relPath(sheetPath))).Relationships.Relationship);
+    const drawing = resolveTarget(sheetPath, sheetRels.find((r) => r["@Id"] === node(worksheet.drawing)["@id"]), "xl/drawings/");
+    const data = node(parser.parse(await xml(zip, drawing)).wsDr);
+    const candidates = [...list(data.twoCellAnchor), ...list(data.oneCellAnchor)].filter((anchor) => anchor.pic && Number(node(anchor.from).row) === 0 && Number(node(anchor.from).col) === 0);
+    if (candidates.length !== 1) throw new Error("Logo template tidak ditemukan.");
+    const embed = node(node(node(candidates[0].pic).blipFill).blip)["@embed"];
+    const imageRels = list(parser.parse(await xml(zip, relPath(drawing))).Relationships.Relationship);
+    const media = resolveTarget(drawing, imageRels.find((r) => r["@Id"] === embed), "xl/media/");
+    const source = zip.file(media);
+    if (!source) throw new Error("Logo template tidak ditemukan.");
+    return sharp(await source.async("nodebuffer"), imageOptions).resize({ width: 440, height: 140, fit: "inside", withoutEnlargement: true }).png().toBuffer();
+  });
 }
 async function renderSlot(zip: JSZip, slot: PhotoSlot, uploaded?: Buffer, watermark?: string, format: "png" | "jpeg" = "png") {
   const original = uploaded || !slot.media ? undefined : zip.file(slot.media);
@@ -159,8 +220,10 @@ async function renderSlot(zip: JSZip, slot: PhotoSlot, uploaded?: Buffer, waterm
   return format === "jpeg" ? sharp(framed).flatten({ background: "#ffffff" }).jpeg({ quality: 90, chromaSubsampling: "4:4:4" }).toBuffer() : framed;
 }
 
-export async function watermarkedPhotoPreview(buffer: Buffer, form: LppForm, itemId: string, watermark: string, uploaded?: Buffer) {
-  const zip = await JSZip.loadAsync(buffer), slot = (await photoSlots(zip, form)).find((slot) => slot.itemId === itemId);
+export async function watermarkedPhotoPreview(buffer: Buffer, form: LppForm, itemId: string, watermark: string, uploaded?: Buffer, knownHash?: string) {
+  const hash = bufferHash(buffer, knownHash);
+  const zip = await getTemplateArchive(buffer, hash);
+  const slot = (await getTemplateSlots(buffer, form, hash)).find((entry) => entry.itemId === itemId);
   if (!slot) throw new Error("Foto perangkat tidak ditemukan.");
   if (!uploaded && !slot.media) throw new Error("Foto perangkat belum diunggah.");
   return renderSlot(zip, slot, uploaded, watermark, form.photoFormat);
@@ -177,9 +240,14 @@ export async function exportPhotos(buffer: Buffer, form: LppForm, photos: { item
   const uploadedByItem = new Map(photos.map((photo) => [photo.itemId, photo.buffer]));
   const replacements = slots.filter((slot) => uploadedByItem.has(slot.itemId) || (Boolean(watermark) && Boolean(slot.media)));
   if (!replacements.length) return buffer;
+  const renderedBuffers = await mapWithConcurrency(
+    replacements,
+    4,
+    (slot) => renderSlot(zip, slot, uploadedByItem.get(slot.itemId), watermark, form.photoFormat)
+  );
   const extension = form.photoFormat === "jpeg" ? "jpg" : "png";
-  for (const slot of replacements) {
-    const replacement = await renderSlot(zip, slot, uploadedByItem.get(slot.itemId), watermark, form.photoFormat);
+  for (const [slotIndex, slot] of replacements.entries()) {
+    const replacement = renderedBuffers[slotIndex];
     let index = 1;
     while (zip.file(`xl/media/lpp-photo-${index}.${extension}`)) index++;
     const media = `xl/media/lpp-photo-${index}.${extension}`;

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { requireLppUser, privateHeaders, lppFailure, readJson, LppError } from "@/lib/lpp/access";
-import { templates, template, drafts, getDraft, saveDraft, getPhoto } from "@/lib/lpp/storage";
+import { templates, template, drafts, getDraft, saveDraft, photoExists } from "@/lib/lpp/storage";
 import { inspectWorkbook, validateEdits } from "@/lib/lpp/workbook";
 import { hasLppForm, getLppForm, hasDocumentationTable } from "@/lib/lpp/form-server";
 import { validatePhotoReferences } from "@/lib/lpp/photo-policy";
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   try {
     const user = await requireLppUser(request), body = await readJson(request);
     if (typeof body.templateId !== "string" || typeof body.title !== "string" || !body.title.trim() || body.title.length > 150) throw new LppError(400, "Judul atau template tidak valid.");
-    const source = await template(body.templateId), workbook = await inspectWorkbook(source.buffer);
+    const source = await template(body.templateId), workbook = await inspectWorkbook(source.buffer, source.hash);
     if (body.templateHash !== workbook.hash) throw new LppError(409, "Template telah berubah. Buka ulang template.");
     let edits;
     try { edits = validateEdits(workbook, body.edits); } catch (error) { throw new LppError(400, (error as Error).message); }
@@ -35,8 +35,8 @@ export async function POST(request: Request) {
     let photos;
     try { photos = validatePhotoReferences(body.photos ?? existing?.photos, form); }
     catch (error) { throw new LppError(400, (error as Error).message); }
-    // Resolve every reference within the authenticated owner's namespace before saving.
-    await Promise.all(Object.values(photos).map((id) => getPhoto(user.id, id)));
+    // Verify each unique referenced photo exists within the authenticated owner's namespace without downloading bytes.
+    await Promise.all([...new Set(Object.values(photos))].map((id) => photoExists(user.id, id)));
     const draft = { id: existing?.id ?? randomUUID(), title: body.title.trim(), templateId: source.id, templateHash: workbook.hash, edits, photos, createdAt, ...(reportDate ? { reportDate } : {}), updatedAt: now, revision: randomUUID() };
     await saveDraft(user.id, draft, existing ? String(body.revision) : undefined);
     return Response.json(draft, { headers: privateHeaders });

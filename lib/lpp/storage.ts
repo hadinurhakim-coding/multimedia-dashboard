@@ -2,13 +2,71 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { readdir, readFile, mkdir, writeFile, rename, unlink, lstat } from "node:fs/promises";
 import path from "node:path";
-import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  ListObjectsV2Command,
+  GetObjectCommand,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+} from "@aws-sdk/client-s3";
+import { mapWithConcurrency } from "@/lib/async";
 import { LppError } from "./access";
 import type { LppDraft, LppTemplate } from "@/types/lpp";
 
 const digest = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const bucket = () => process.env.LPP_S3_BUCKET;
-function client() { return new S3Client({ endpoint: process.env.AWS_ENDPOINT_URL_S3, region: process.env.AWS_REGION ?? "us-east-1", forcePathStyle: true }); }
+
+let cachedS3Client: { configKey: string; client: S3Client } | null = null;
+function client() {
+  const endpoint = process.env.AWS_ENDPOINT_URL_S3;
+  const region = process.env.AWS_REGION ?? "us-east-1";
+  const configKey = JSON.stringify([
+    endpoint ?? "",
+    region,
+    process.env.AWS_ACCESS_KEY_ID ?? "",
+    process.env.AWS_SECRET_ACCESS_KEY ?? "",
+  ]);
+  if (!cachedS3Client || cachedS3Client.configKey !== configKey) {
+    cachedS3Client = {
+      configKey,
+      client: new S3Client({ endpoint, region, forcePathStyle: true }),
+    };
+  }
+  return cachedS3Client.client;
+}
+
+const TEMPLATE_LIST_TTL_MS = 60_000;
+const TEMPLATE_FILE_TTL_MS = 300_000;
+const MAX_TEMPLATE_CACHE_ENTRIES = 16;
+
+type CachedTemplateList = { items: LppTemplate[]; expiresAt: number };
+type CachedTemplateFile = {
+  id: string;
+  name: string;
+  buffer: Buffer;
+  hash: string;
+  mtimeMs?: number;
+  expiresAt: number;
+};
+
+const templateListCache = new Map<string, CachedTemplateList>();
+const inflightTemplateLists = new Map<string, Promise<LppTemplate[]>>();
+const templateFileCache = new Map<string, CachedTemplateFile>();
+const inflightTemplateFiles = new Map<string, Promise<{ id: string; name: string; buffer: Buffer; hash: string }>>();
+
+function storageScope() {
+  return bucket() ? `s3:${bucket()}` : `fs:${root()}`;
+}
+
+function setBoundedTemplateFile(cacheKey: string, value: CachedTemplateFile) {
+  if (templateFileCache.has(cacheKey)) templateFileCache.delete(cacheKey);
+  templateFileCache.set(cacheKey, value);
+  if (templateFileCache.size > MAX_TEMPLATE_CACHE_ENTRIES) {
+    const oldest = templateFileCache.keys().next().value;
+    if (oldest !== undefined) templateFileCache.delete(oldest);
+  }
+}
 function root() {
   if (process.env.NODE_ENV === "production" && !process.env.LPP_PRIVATE_DIR) throw new LppError(503, "Penyimpanan LPP privat belum dikonfigurasi.");
   const result = path.resolve(/* turbopackIgnore: true */ process.env.LPP_PRIVATE_DIR || path.join(process.cwd(), "private"));
@@ -40,12 +98,77 @@ async function read(key: string): Promise<{ body: Buffer; etag?: string }> {
   return { body: await readFile(/* turbopackIgnore: true */ file) };
 }
 export async function templates(): Promise<LppTemplate[]> {
-  return (await entries("data-lpp")).filter((name) => name.endsWith(".xlsx") && !name.startsWith("~$")).sort().map((name) => ({ id: digest(name), name: name.slice(0, -5) }));
+  const scope = storageScope();
+  const cached = templateListCache.get(scope);
+  if (cached && cached.expiresAt > Date.now()) return cached.items;
+  const pendingList = inflightTemplateLists.get(scope);
+  if (pendingList) return pendingList;
+
+  const task = (async () => {
+    const items = (await entries("data-lpp"))
+      .filter((name) => name.endsWith(".xlsx") && !name.startsWith("~$"))
+      .sort()
+      .map((name) => ({ id: digest(name), name: name.slice(0, -5) }));
+    if (templateListCache.size > MAX_TEMPLATE_CACHE_ENTRIES) templateListCache.clear();
+    templateListCache.set(scope, { items, expiresAt: Date.now() + TEMPLATE_LIST_TTL_MS });
+    return items;
+  })();
+
+  inflightTemplateLists.set(scope, task);
+  try { return await task; } finally { inflightTemplateLists.delete(scope); }
 }
 export async function template(id: string) {
   const item = (await templates()).find((t) => t.id === id);
   if (!item) throw new LppError(404, "Template tidak ditemukan.");
-  return { ...item, buffer: (await read(`data-lpp/${item.name}.xlsx`)).body };
+
+  const scope = storageScope();
+  const cacheKey = `${scope}:${id}`;
+  const key = `data-lpp/${item.name}.xlsx`;
+  const cached = templateFileCache.get(cacheKey);
+  const now = Date.now();
+
+  if (bucket()) {
+    if (cached && cached.expiresAt > now) {
+      return { id: cached.id, name: cached.name, buffer: cached.buffer, hash: cached.hash };
+    }
+  } else {
+    const file = path.join(/* turbopackIgnore: true */ root(), key);
+    const info = await lstat(/* turbopackIgnore: true */ file);
+    if (info.isSymbolicLink()) throw new Error("Symlink is not allowed");
+    if (cached && cached.mtimeMs === info.mtimeMs) {
+      return { id: cached.id, name: cached.name, buffer: cached.buffer, hash: cached.hash };
+    }
+  }
+
+  const inflight = inflightTemplateFiles.get(cacheKey);
+  if (inflight) return inflight;
+
+  const task = (async () => {
+    let buffer: Buffer;
+    let mtimeMs: number | undefined;
+    if (bucket()) {
+      buffer = (await read(key)).body;
+    } else {
+      const file = path.join(/* turbopackIgnore: true */ root(), key);
+      const info = await lstat(/* turbopackIgnore: true */ file);
+      if (info.isSymbolicLink()) throw new Error("Symlink is not allowed");
+      mtimeMs = info.mtimeMs;
+      buffer = await readFile(/* turbopackIgnore: true */ file);
+    }
+    const hash = digest(buffer);
+    setBoundedTemplateFile(cacheKey, {
+      id: item.id,
+      name: item.name,
+      buffer,
+      hash,
+      mtimeMs,
+      expiresAt: Date.now() + TEMPLATE_FILE_TTL_MS,
+    });
+    return { ...item, buffer, hash };
+  })();
+
+  inflightTemplateFiles.set(cacheKey, task);
+  try { return await task; } finally { inflightTemplateFiles.delete(cacheKey); }
 }
 const ownerPrefix = (owner: string) => `lpp-drafts/${digest(owner)}`;
 function draftKey(owner: string, id: string) {
@@ -60,11 +183,19 @@ export async function getDraft(owner: string, id: string) {
   }
 }
 export async function drafts(owner: string) {
-  const result: LppDraft[] = [];
-  for (const name of await entries(ownerPrefix(owner))) {
-    if (/^[a-f0-9-]{36}\.json$/.test(name)) result.push((await getDraft(owner, name.slice(0, -5))).draft);
-  }
-  return result.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const ids = (await entries(ownerPrefix(owner)))
+    .filter((name) => /^[a-f0-9-]{36}\.json$/.test(name))
+    .map((name) => name.slice(0, -5));
+  const result = await mapWithConcurrency(ids, 8, async (id) => {
+    try { return (await getDraft(owner, id)).draft; }
+    catch (error) {
+      if (error instanceof LppError && error.status === 404) return null;
+      throw error;
+    }
+  });
+  return result
+    .filter((item): item is LppDraft => item !== null)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 // Local writes serialize per process; S3 uses conditional ETags across instances.
 let pending = Promise.resolve();
@@ -104,6 +235,28 @@ export async function deleteDraft(owner: string, id: string) {
 function photoKey(owner: string, id: string) {
   if (!/^[a-f0-9]{64}$/.test(id)) throw new LppError(404, "Foto tidak ditemukan.");
   return `lpp-photos/${digest(owner)}/${id}.jpg`;
+}
+export async function photoExists(owner: string, id: string): Promise<void> {
+  const key = photoKey(owner, id);
+  if (bucket()) {
+    try {
+      await client().send(new HeadObjectCommand({ Bucket: bucket(), Key: key }));
+      return;
+    } catch (error) {
+      const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+      if (status === 404 || (error as Error).name === "NotFound" || (error as Error).name === "NoSuchKey") {
+        throw new LppError(404, "Foto tidak ditemukan.");
+      }
+      throw error;
+    }
+  }
+  try {
+    const info = await lstat(/* turbopackIgnore: true */ path.join(root(), key));
+    if (info.isSymbolicLink() || !info.isFile()) throw new LppError(404, "Foto tidak ditemukan.");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new LppError(404, "Foto tidak ditemukan.");
+    throw error;
+  }
 }
 export async function getPhoto(owner: string, id: string) {
   try { return (await read(photoKey(owner, id))).body; }

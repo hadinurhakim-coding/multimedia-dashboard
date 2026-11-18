@@ -34,6 +34,9 @@ export async function enforceLimits(entries: { scope: RateScope; subject: string
     throw new AppError(429, "Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi.", Math.max(1, ...blocked.map(row => Number(row.retry_after) || 60)));
   }
 }
-export function limitRequest(request: Request, userId?: string) {
-  return enforceLimits(userId ? userRateScopes(request).map(scope => ({ scope, subject: userId })) : [{ scope: "ingress", subject: requestClient(request) }]);
+export function limitRequest(request: Request, userId?: string, options?: { includeIngress?: boolean }) {
+  if (!userId) return enforceLimits([{ scope: "ingress", subject: requestClient(request) }]);
+  const entries = userRateScopes(request).map(scope => ({ scope, subject: userId }));
+  if (options?.includeIngress) entries.unshift({ scope: "ingress", subject: requestClient(request) });
+  return enforceLimits(entries);
 }

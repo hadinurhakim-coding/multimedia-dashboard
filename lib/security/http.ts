@@ -2,6 +2,11 @@ export class AppError extends Error {
   constructor(public status: number, message: string, public retryAfter?: number) { super(message); }
 }
 export const privateHeaders = { "Cache-Control": "private, no-store, max-age=0", "Vary": "Cookie", "X-Content-Type-Options": "nosniff" };
+export const privateImageHeaders = {
+  "Cache-Control": "private, max-age=3600, stale-while-revalidate=86400",
+  Vary: "Cookie",
+  "X-Content-Type-Options": "nosniff",
+};
 export function appFailure(error: unknown, fallback = "Layanan belum dapat diproses. Silakan coba kembali.") {
   return Response.json({ error: error instanceof AppError ? error.message : fallback }, {
     status: error instanceof AppError ? error.status : 503,

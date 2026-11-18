@@ -39,25 +39,26 @@ export async function GET(request: Request) {
   await connection();
   try {
     await requireAppUser(request, "events:read");
-    const eventRows = await queryNeon<EventRow>(`
-      SELECT 
-        id, title, to_char(date, 'YYYY-MM-DD') as date,
-        start_time, end_time, time, task_category, task_type,
-        room, agenda, duration_hours, assigned_member_ids,
-        assigned_member_names, technician_roles, status, notes,
-        created_at
-      FROM overtime_events
-      ORDER BY date ASC;
-    `);
-
-    const memberRows = await queryNeon<MemberRow>(`
-      SELECT 
-        id, name, email, role, total_hours, total_sessions,
-        to_char(last_overtime_date, 'YYYY-MM-DD') as last_overtime_date,
-        created_at
-      FROM members
-      ORDER BY id ASC;
-    `);
+    const [eventRows, memberRows] = await Promise.all([
+      queryNeon<EventRow>(`
+        SELECT 
+          id, title, to_char(date, 'YYYY-MM-DD') as date,
+          start_time, end_time, time, task_category, task_type,
+          room, agenda, duration_hours, assigned_member_ids,
+          assigned_member_names, technician_roles, status, notes,
+          created_at
+        FROM overtime_events
+        ORDER BY date ASC;
+      `),
+      queryNeon<MemberRow>(`
+        SELECT 
+          id, name, email, role, total_hours, total_sessions,
+          to_char(last_overtime_date, 'YYYY-MM-DD') as last_overtime_date,
+          created_at
+        FROM members
+        ORDER BY id ASC;
+      `),
+    ]);
 
     const events: OvertimeEvent[] = eventRows.map((r) => {
       const assignedIds = typeof r.assigned_member_ids === "string" 

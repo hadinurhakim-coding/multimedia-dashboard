@@ -5,5 +5,5 @@ export function getAuth() {
   const baseUrl = process.env.NEON_AUTH_BASE_URL;
   const secret = process.env.NEON_AUTH_COOKIE_SECRET;
   if (!baseUrl || !secret || secret.length < 32) throw new Error("AUTH_NOT_CONFIGURED");
-  return createNeonAuth({ baseUrl, cookies: { secret, sessionDataTtl: 1 } });
+  return createNeonAuth({ baseUrl, cookies: { secret, sessionDataTtl: 60 } });
 }

@@ -22,6 +22,7 @@ import { buildLppBreadcrumbItems, type LppBreadcrumbAction } from "@/lib/lpp/bre
 import { bulkExportArchiveName, parseExportFilename, uniqueZipEntryName } from "@/lib/lpp/bulk-export";
 import { buildDraftFolders, type DraftSummary } from "@/lib/lpp/draft-folders";
 import { formErrors, type LppForm } from "@/lib/lpp/form";
+import { preparePhotoForUpload } from "@/lib/lpp/photo-client";
 import { applyReportDate, resolveReportDate, validateReportDate } from "@/lib/lpp/report-date";
 import { templateDisplayName } from "@/lib/lpp/naming";
 import {
@@ -32,7 +33,7 @@ import {
 } from "@/lib/lpp/view-state";
 import type { CellEdit, CellValue, LppDraft, LppPhotos, LppTemplate, LppWorkbook } from "@/types/lpp";
 
-type Catalog = { templates: LppTemplate[]; drafts: Omit<LppDraft, "edits">[]; email: string };
+type Catalog = { templates: LppTemplate[]; drafts: DraftSummary[]; email: string };
 type Document = LppWorkbook & LppTemplate & { form: LppForm | null; defaultReportDate: string };
 const col = (n: number): string => n > 26 ? col(Math.floor((n - 1) / 26)) + col((n - 1) % 26 + 1) : String.fromCharCode(64 + n);
 const point = (a: string) => ({ row: Number(a.match(/\d+/)![0]), column: [...a.match(/[A-Z]+/)![0]].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0) });
@@ -196,7 +197,18 @@ export function LppView({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => 
     const saved = await (await api("/api/lpp", { method: "POST", body: JSON.stringify({ id: draft?.id, revision: draft?.revision, title, templateId: document.id, templateHash: document.hash, edits: Object.values(edits), photos, ...(document.form?.reportHeader ? { reportDate } : {}) }) })).json() as LppDraft;
     setDraft(saved); setEdits(Object.fromEntries(saved.edits.map((e) => [key(e.sheet, e.address), e]))); setDirty(false);
     persistNav({ screen: "editor", folderId: null, monthFilter: "all", templateId: saved.templateId, draftId: saved.id });
-    await refresh(); return saved;
+    const { edits: savedEdits, photos: savedPhotos, ...savedRest } = saved;
+    const summary: DraftSummary = {
+      ...savedRest,
+      changes: savedEdits.length,
+      photoCount: Object.keys(savedPhotos ?? {}).length,
+    };
+    setCatalog((current) => {
+      if (!current) return current;
+      const remaining = current.drafts.filter((item) => item.id !== summary.id);
+      return { ...current, drafts: [summary, ...remaining] };
+    });
+    return saved;
   }
   async function downloadDraft(id: string) {
     const response = await api("/api/lpp/export", { method: "POST", body: JSON.stringify({ id }) });
@@ -268,7 +280,8 @@ export function LppView({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => 
   async function uploadPhoto(itemId: string, file: File) {
     setBusy(true); setBusyAction("photo"); setBusyLabel("Mengunggah foto…"); setMessage("");
     try {
-      const result = await (await api("/api/lpp/photos", { method: "POST", headers: { "Content-Type": file.type }, body: file })).json() as { id: string };
+      const prepared = await preparePhotoForUpload(file);
+      const result = await (await api("/api/lpp/photos", { method: "POST", headers: { "Content-Type": prepared.type }, body: prepared })).json() as { id: string };
       setPhotos((current) => ({ ...current, [itemId]: result.id })); setDirty(true);
     } finally { setBusy(false); setBusyAction(null); setBusyLabel("Memproses…"); }
   }

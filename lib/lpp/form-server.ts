@@ -1,5 +1,5 @@
 import "server-only";
-import { buildInstallationForm } from "./form";
+import { buildInstallationForm, type LppForm } from "./form";
 import { buildDocumentationForm } from "./documentation-form";
 import { buildAuditoriumDocumentationForm } from "./auditorium-form";
 import { buildCollaborationDocumentationForm } from "./collaboration-form";
@@ -26,7 +26,10 @@ export function hasDocumentationTable(templateId: string) {
     || Boolean(process.env.LPP_SOC_TEMPLATE_ID) && templateId === process.env.LPP_SOC_TEMPLATE_ID
     || BLANK_DOCUMENTATION_TEMPLATES.some(([envName]) => Boolean(process.env[envName]) && templateId === process.env[envName]);
 }
-export function getLppForm(templateId: string, workbook: LppWorkbook) {
+const MAX_FORM_CACHE_ENTRIES = 32;
+const formCache = new Map<string, LppForm | null>();
+
+function resolveFormInternal(templateId: string, workbook: LppWorkbook): LppForm | null {
   const blankMatch = BLANK_DOCUMENTATION_TEMPLATES.find(([envName]) => Boolean(process.env[envName]) && templateId === process.env[envName]);
   if (blankMatch) return buildBlankDocumentationForm(workbook, blankMatch[1]);
   if (process.env.LPP_SOC_TEMPLATE_ID && templateId === process.env.LPP_SOC_TEMPLATE_ID) return buildSocDocumentationForm(workbook);
@@ -36,4 +39,28 @@ export function getLppForm(templateId: string, workbook: LppWorkbook) {
   if (process.env.LPP_AUDITORIUM_TEMPLATE_ID && templateId === process.env.LPP_AUDITORIUM_TEMPLATE_ID) return buildAuditoriumDocumentationForm(workbook);
   if (hasDocumentationTable(templateId)) return buildDocumentationForm(workbook);
   return hasLppForm(templateId) ? buildInstallationForm(workbook) : null;
+}
+
+export function getLppForm(templateId: string, workbook: LppWorkbook) {
+  const envSig = [
+    process.env.LPP_FORM_TEMPLATE_ID,
+    process.env.LPP_DOCUMENTATION_TEMPLATE_ID,
+    process.env.LPP_AUDITORIUM_TEMPLATE_ID,
+    process.env.LPP_AUDITORIUM_PHASE1_TEMPLATE_ID,
+    process.env.LPP_COLLABORATION_TEMPLATE_ID,
+    process.env.LPP_PBH_TEMPLATE_ID,
+    process.env.LPP_SOC_TEMPLATE_ID,
+    process.env.LPP_COMMAND_CENTER_TEMPLATE_ID,
+    process.env.LPP_TASK_FORCE_TEMPLATE_ID,
+    process.env.LPP_HC_OPERATION_TEMPLATE_ID,
+  ].join("|");
+  const cacheKey = `${templateId}:${workbook.hash}:${envSig}`;
+  if (formCache.has(cacheKey)) return formCache.get(cacheKey)!;
+  const resolved = resolveFormInternal(templateId, workbook);
+  if (formCache.size >= MAX_FORM_CACHE_ENTRIES) {
+    const oldest = formCache.keys().next().value;
+    if (oldest !== undefined) formCache.delete(oldest);
+  }
+  formCache.set(cacheKey, resolved);
+  return resolved;
 }

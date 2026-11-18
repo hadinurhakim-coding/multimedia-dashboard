@@ -6,12 +6,17 @@ import { internalPermission, mayAccessApp, type AppPermission } from "./policy";
 import { AppError, requireSameOrigin } from "@/lib/security/http";
 import { limitRequest, securityEvent } from "@/lib/security/gateway";
 
-export async function currentAppUser() {
+export async function currentAppUser(options?: { disableCookieCache?: boolean }) {
   const config = accessConfig();
   if (config.disabled) throw new AppError(503, "Akses aplikasi sedang dinonaktifkan oleh administrator.");
   if (!(await headers()).get("cookie")) throw new AppError(401, "Silakan masuk untuk melanjutkan.");
+  const disableCookieCache = options?.disableCookieCache ?? true;
   let result;
-  try { result = await getAuth().getSession({ query: { disableCookieCache: "true" } }); }
+  try {
+    result = await getAuth().getSession(
+      disableCookieCache ? { query: { disableCookieCache: "true" } } : undefined
+    );
+  }
   catch { throw new AppError(503, "Layanan login belum tersedia. Silakan coba kembali."); }
   if (result.error && result.error.status !== 401) throw new AppError(503, "Layanan login belum tersedia. Silakan coba kembali.");
   const session = result.data;
@@ -26,10 +31,22 @@ export async function currentAppUser() {
 }
 export async function requireAppUser(request: Request, permission: AppPermission = "dashboard") {
   requireSameOrigin(request, process.env.APP_ORIGIN);
-  await limitRequest(request);
-  const user = await currentAppUser();
-  if (!internalPermission(permission)) { securityEvent("permission_denied", user.id); throw new AppError(403, "Akses ditolak."); }
-  await limitRequest(request, user.id);
+  const isRead = request.method === "GET" || request.method === "HEAD";
+  const isSessionCheck = new URL(request.url).pathname === "/api/session";
+  const disableCookieCache = !isRead || isSessionCheck;
+  let user;
+  try {
+    user = await currentAppUser({ disableCookieCache });
+  } catch (error) {
+    await limitRequest(request);
+    throw error;
+  }
+  if (!internalPermission(permission)) {
+    await limitRequest(request, user.id, { includeIngress: true });
+    securityEvent("permission_denied", user.id);
+    throw new AppError(403, "Akses ditolak.");
+  }
+  await limitRequest(request, user.id, { includeIngress: true });
   return user;
 }
 

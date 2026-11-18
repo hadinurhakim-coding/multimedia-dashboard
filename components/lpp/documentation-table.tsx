@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DEFAULT_PAGE_SIZE, paginateRows } from "@/lib/pagination";
 import { PhotoPreview } from "./photo-form";
 import { formPhotoSlots, readFormField, type LppForm } from "@/lib/lpp/form";
-import { MAX_PHOTO_BYTES, PHOTO_TYPES } from "@/lib/lpp/photo-policy";
+import { prepareValidatedPhotoUpload } from "@/lib/lpp/photo-client";
 import { lppPhotoWatermark } from "@/lib/lpp/naming";
 import type { CellEdit, LppPhotos, LppWorkbook } from "@/types/lpp";
 
@@ -61,8 +61,9 @@ export function DocumentationTable({ form, workbook, edits, templateId, template
   async function upload(slotId: string, file?: File) {
     if (!file) return;
     setError(""); setMessage("");
-    if (!PHOTO_TYPES.includes(file.type) || !file.size || file.size > MAX_PHOTO_BYTES) { setError("Pilih foto JPG, PNG, atau WebP maksimal 4 MB."); return; }
-    try { await onUpload(slotId, file); setMessage("Foto terbaru siap. Simpan draf atau ekspor Excel untuk menyimpan perubahan laporan."); }
+    const prepared = await prepareValidatedPhotoUpload(file);
+    if (!prepared.ok) { setError(prepared.error); return; }
+    try { await onUpload(slotId, prepared.file); setMessage("Foto terbaru siap. Simpan draf atau ekspor Excel untuk menyimpan perubahan laporan."); }
     catch (error) { setError(error instanceof Error ? error.message : "Unggah foto gagal. Coba lagi."); }
   }
   function reset(ids: string[]) {

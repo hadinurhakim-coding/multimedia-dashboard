@@ -1,4 +1,4 @@
-import { requireLppUser, privateHeaders, lppFailure } from "@/lib/lpp/access";
+import { requireLppUser, privateImageHeaders, lppFailure } from "@/lib/lpp/access";
 import { getPhoto } from "@/lib/lpp/storage";
 import { photoPreview } from "@/lib/lpp/photos";
 
@@ -7,6 +7,6 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const user = await requireLppUser(request);
     let buffer = await getPhoto(user.id, (await context.params).id);
     if (new URL(request.url).searchParams.get("thumbnail") === "1") buffer = await photoPreview(buffer, true);
-    return new Response(new Uint8Array(buffer), { headers: { ...privateHeaders, "Content-Type": "image/jpeg" } });
+    return new Response(new Uint8Array(buffer), { headers: { ...privateImageHeaders, "Content-Type": "image/jpeg" } });
   } catch (error) { return lppFailure(error); }
 }

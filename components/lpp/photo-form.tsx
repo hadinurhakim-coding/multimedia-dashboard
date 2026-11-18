@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { readFormField, type LppForm } from "@/lib/lpp/form";
-import { MAX_PHOTO_BYTES, PHOTO_TYPES } from "@/lib/lpp/photo-policy";
+import { prepareValidatedPhotoUpload } from "@/lib/lpp/photo-client";
 import type { CellEdit, LppPhotos, LppWorkbook } from "@/types/lpp";
 
 export function PhotoPreview({ src, alt }: { src: string; alt: string }) {
@@ -34,8 +34,9 @@ export function PhotoForm({ form, workbook, edits, templateId, photos, busy, onU
   async function choose(file?: File) {
     if (!file) return;
     setError(""); setStatus("");
-    if (!PHOTO_TYPES.includes(file.type) || file.size > MAX_PHOTO_BYTES || !file.size) { setError("Pilih foto JPG, PNG, atau WebP maksimal 4 MB."); return; }
-    try { await onUpload(selectedId, file); setStatus("Foto siap digunakan. Simpan draf atau ekspor Excel untuk menyimpan perubahan laporan."); }
+    const prepared = await prepareValidatedPhotoUpload(file);
+    if (!prepared.ok) { setError(prepared.error); return; }
+    try { await onUpload(selectedId, prepared.file); setStatus("Foto siap digunakan. Simpan draf atau ekspor Excel untuk menyimpan perubahan laporan."); }
     catch (error) { setError(error instanceof Error ? error.message : "Foto belum berhasil diunggah. Coba lagi."); }
   }
   return <Card className="shadow-none">

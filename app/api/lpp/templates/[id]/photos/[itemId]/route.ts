@@ -1,4 +1,4 @@
-import { requireLppUser, privateHeaders, lppFailure, LppError } from "@/lib/lpp/access";
+import { requireLppUser, privateImageHeaders, lppFailure, LppError } from "@/lib/lpp/access";
 import { getPhoto, template } from "@/lib/lpp/storage";
 import { inspectWorkbook } from "@/lib/lpp/workbook";
 import { getLppForm } from "@/lib/lpp/form-server";
@@ -11,7 +11,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   try {
     const user = await requireLppUser(request);
     const { id, itemId } = await context.params, source = await template(id);
-    const form = getLppForm(id, await inspectWorkbook(source.buffer));
+    const form = getLppForm(id, await inspectWorkbook(source.buffer, source.hash));
     const slot = form ? formPhotoSlots(form).find((entry) => entry.id === itemId) : undefined;
     if (!form || !slot) throw new LppError(404, "Foto perangkat tidak ditemukan.");
     const params = new URL(request.url).searchParams;
@@ -22,11 +22,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       catch { throw new LppError(400, "Tanggal watermark tidak valid."); }
       const photoId = params.get("photo");
       if (!photoId && slot.hasTemplatePhoto === false) throw new LppError(404, "Foto perangkat belum diunggah.");
-      const buffer = await watermarkedPhotoPreview(source.buffer, form, itemId, lppPhotoWatermark(source.name, date), photoId ? await getPhoto(user.id, photoId) : undefined);
-      return new Response(new Uint8Array(buffer), { headers: { ...privateHeaders, "Content-Type": `image/${form.photoFormat ?? "png"}` } });
+      const buffer = await watermarkedPhotoPreview(source.buffer, form, itemId, lppPhotoWatermark(source.name, date), photoId ? await getPhoto(user.id, photoId) : undefined, source.hash);
+      return new Response(new Uint8Array(buffer), { headers: { ...privateImageHeaders, "Content-Type": `image/${form.photoFormat ?? "png"}` } });
     }
     if (slot.hasTemplatePhoto === false) throw new LppError(404, "Foto perangkat belum diunggah.");
-    const buffer = await templatePhoto(source.buffer, form, itemId, new URL(request.url).searchParams.get("thumbnail") === "1");
-    return new Response(new Uint8Array(buffer), { headers: { ...privateHeaders, "Content-Type": "image/jpeg" } });
+    const buffer = await templatePhoto(source.buffer, form, itemId, params.get("thumbnail") === "1", source.hash);
+    return new Response(new Uint8Array(buffer), { headers: { ...privateImageHeaders, "Content-Type": "image/jpeg" } });
   } catch (error) { return lppFailure(error); }
 }

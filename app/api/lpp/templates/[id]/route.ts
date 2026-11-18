@@ -8,7 +8,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   try {
     await requireLppUser(request);
     const source = await template((await context.params).id);
-    const workbook = await inspectWorkbook(source.buffer);
+    const workbook = await inspectWorkbook(source.buffer, source.hash);
     return Response.json({ id: source.id, name: templateDisplayName(source.name), ...workbook, form: getLppForm(source.id, workbook), defaultReportDate: jakartaDate() }, { headers: privateHeaders });
   } catch (error) { return lppFailure(error); }
 }
