@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useId, useState } from "react";
-import { FileSpreadsheet, Download, Save, FolderOpen, Plus, Loader2 } from "lucide-react";
+import { ArrowLeft, FileSpreadsheet, Download, Save, FolderOpen, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { appFetch } from "@/lib/auth/fetch";
@@ -8,6 +8,7 @@ import { InstallationForm } from "./installation-form";
 import { DocumentationTable } from "./documentation-table";
 import { ReportHeader } from "./report-header";
 import { DraftsPage } from "./drafts-page";
+import { TemplateCatalogTable } from "./template-catalog-table";
 import { formErrors, type LppForm } from "@/lib/lpp/form";
 import { applyReportDate, resolveReportDate, validateReportDate } from "@/lib/lpp/report-date";
 import { templateDisplayName } from "@/lib/lpp/naming";
@@ -31,6 +32,7 @@ export function LppView({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => 
   const [busy, setBusy] = useState(false);
   const [busyAction, setBusyAction] = useState<"new" | "save" | "export" | "photo" | "other" | null>(null);
   const [busyLabel, setBusyLabel] = useState("Memproses…");
+  const [openingTemplateId, setOpeningTemplateId] = useState<string | null>(null);
   const titleInputId = useId();
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState("");
@@ -70,8 +72,12 @@ export function LppView({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => 
   }, [dirty]);
   const run = async (fn: () => Promise<void>, label = "Memproses…", action: "new" | "save" | "export" | "other" = "other") => {
     setBusy(true); setBusyAction(action); setBusyLabel(label); setMessage("");
-    try { await fn(); } catch (error) { setMessage(error instanceof Error ? error.message : "Terjadi kesalahan."); } finally { setBusy(false); setBusyAction(null); setBusyLabel("Memproses…"); }
+    try { await fn(); } catch (error) { setMessage(error instanceof Error ? error.message : "Terjadi kesalahan."); } finally { setBusy(false); setBusyAction(null); setBusyLabel("Memproses…"); setOpeningTemplateId(null); }
   };
+  function closeDocument() {
+    if (dirty && !window.confirm("Perubahan belum disimpan. Tutup template ini?")) return;
+    setDocument(null); setDraft(null); setEdits({}); setPhotos({}); setReportDate(""); setDirty(false); setTitle(""); setMessage(""); setShowFormErrors(false); setShowSheetEditor(false);
+  }
   async function open(templateId: string, existing?: LppDraft) {
     if (dirty && !window.confirm("Perubahan belum disimpan. Buka dokumen lain?")) return;
     const data = await (await api(`/api/lpp/templates/${templateId}`)).json() as Document;
@@ -172,10 +178,24 @@ export function LppView({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => 
       }}
     /> : <>
       <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-white p-4">
-        <label className="min-w-0 flex-1 space-y-1 text-sm"><span>Template laporan</span><select aria-label="Template laporan" className="h-10 w-full rounded-md border bg-white px-3" value={document?.id ?? ""} disabled={busy} onChange={(e) => { if (e.target.value) void run(() => open(e.target.value), "Memuat template…"); }}><option value="">Pilih template…</option>{catalog.templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.documentationTableAvailable ? " — Tabel dokumentasi" : t.formAvailable ? " — Form input" : ""}</option>)}</select></label>
+        <label className="min-w-0 flex-1 space-y-1 text-sm"><span>Template laporan</span><select aria-label="Template laporan" className="h-10 w-full rounded-md border bg-white px-3" value={document?.id ?? ""} disabled={busy} onChange={(e) => { if (e.target.value) { setOpeningTemplateId(e.target.value); void run(() => open(e.target.value), "Memuat template…"); } }}><option value="">Pilih template…</option>{catalog.templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.documentationTableAvailable ? " — Tabel dokumentasi" : t.formAvailable ? " — Form input" : ""}</option>)}</select></label>
+        {document && <Button variant="outline" className="h-10" disabled={busy} onClick={closeDocument}><ArrowLeft className="size-4" />Daftar template</Button>}
         <Button variant="outline" className="h-10" disabled={busy} onClick={() => void run(async () => { await refresh(); setScreen("drafts"); window.scrollTo({ top: 0 }); }, "Memuat draf…")}><FolderOpen className="size-4" />Draf</Button>
         {!catalog.templates.length && <p className="w-full text-sm">Template belum tersedia. Hubungi administrator.</p>}
       </div>
+      {!document && (
+        <TemplateCatalogTable
+          templates={catalog.templates}
+          drafts={catalog.drafts}
+          busy={busy}
+          openingTemplateId={openingTemplateId}
+          onSelect={(templateId) => {
+            setOpeningTemplateId(templateId);
+            void run(() => open(templateId), "Memuat template…");
+          }}
+          onOpenDrafts={() => void run(async () => { await refresh(); setScreen("drafts"); window.scrollTo({ top: 0 }); }, "Memuat draf…")}
+        />
+      )}
       {document && sheet && <div className="space-y-3">
         <div className="space-y-1.5 rounded-xl border bg-white p-3 shadow-sm">
           <div className="flex min-h-5 items-center justify-between gap-2">
