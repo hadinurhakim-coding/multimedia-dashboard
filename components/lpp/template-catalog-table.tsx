@@ -5,6 +5,7 @@ import { ArrowUpDown, FileSpreadsheet, FolderOpen, Loader2, Search, X } from "lu
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TablePagination } from "@/components/ui/table-pagination";
 import {
   Table,
   TableBody,
@@ -13,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DEFAULT_PAGE_SIZE, paginateRows } from "@/lib/pagination";
 import type { DraftSummary } from "@/lib/lpp/draft-folders";
 import {
   buildTemplateCatalogRows,
@@ -47,6 +49,8 @@ export function TemplateCatalogTable({
   const [query, setQuery] = React.useState("");
   const [formatFilter, setFormatFilter] = React.useState<"all" | TemplateFormatKind>("all");
   const [sortOrder, setSortOrder] = React.useState<TemplateSortOrder>("default");
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(DEFAULT_PAGE_SIZE);
 
   const rows = buildTemplateCatalogRows(templates, drafts);
   const visible = filterTemplateCatalogRows(rows, {
@@ -54,6 +58,7 @@ export function TemplateCatalogTable({
     format: formatFilter,
     sort: sortOrder,
   });
+  const paged = paginateRows(visible, page, pageSize);
 
   const hasFilters = Boolean(query.trim()) || formatFilter !== "all" || sortOrder !== "default";
   const formatOptions: { value: "all" | TemplateFormatKind; label: string }[] = [
@@ -73,6 +78,7 @@ export function TemplateCatalogTable({
     setQuery("");
     setFormatFilter("all");
     setSortOrder("default");
+    setPage(1);
   }
 
   return (
@@ -104,7 +110,7 @@ export function TemplateCatalogTable({
             placeholder="Cari nama template atau jenis…"
             className="h-9 bg-white pl-9"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => { setQuery(event.target.value); setPage(1); }}
           />
         </div>
 
@@ -114,7 +120,7 @@ export function TemplateCatalogTable({
               aria-label="Filter jenis template"
               className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm text-pln-charcoal outline-hidden focus-visible:ring-2 focus-visible:ring-pln-cyan"
               value={formatFilter}
-              onChange={(event) => setFormatFilter(event.target.value as "all" | TemplateFormatKind)}
+              onChange={(event) => { setFormatFilter(event.target.value as "all" | TemplateFormatKind); setPage(1); }}
             >
               {formatOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -143,7 +149,7 @@ export function TemplateCatalogTable({
                   variant="ghost"
                   size="sm"
                   className="-ml-2 h-8 px-2 font-medium text-pln-charcoal hover:text-pln-navy"
-                  onClick={() => setSortOrder((current) => NEXT_SORT[current])}
+                  onClick={() => { setSortOrder((current) => NEXT_SORT[current]); setPage(1); }}
                 >
                   <span>Nama template</span>
                   <ArrowUpDown className="size-3.5 text-zinc-400" aria-hidden="true" />
@@ -155,7 +161,7 @@ export function TemplateCatalogTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {visible.map((row) => {
+            {paged.items.map((row) => {
               const isOpening = busy && openingTemplateId === row.id;
               return (
                 <TableRow key={row.id} className="hover:bg-pln-ice/40">
@@ -244,10 +250,18 @@ export function TemplateCatalogTable({
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500">
         <span>
-          Menampilkan {visible.length} dari {rows.length} template
+          Menampilkan {paged.totalItems ? paged.startIndex + 1 : 0}–{paged.endIndex} dari {rows.length} template
         </span>
         <span>Klik nama template atau &ldquo;Buka template&rdquo; untuk mulai menyusun laporan.</span>
       </div>
+      <TablePagination
+        page={paged.page}
+        totalPages={paged.totalPages}
+        pageSize={pageSize}
+        disabled={busy}
+        onPageChange={setPage}
+        onPageSizeChange={(nextSize) => { setPageSize(nextSize); setPage(1); }}
+      />
     </section>
   );
 }

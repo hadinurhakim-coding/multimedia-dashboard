@@ -13,14 +13,14 @@ import {
   Clock,
   MapPin,
   UserCheck,
-  ChevronLeft,
-  ChevronRight,
   X,
   CheckCircle2,
   Copy,
   Check,
   Eye,
 } from "lucide-react";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { DEFAULT_PAGE_SIZE, paginateRows } from "@/lib/pagination";
 import { OvertimeEvent, EventStatus } from "@/types/event";
 import { getEffectiveEventStatus, generateWAGBroadcastText, copyTextToClipboard } from "@/lib/schedule-utils";
 import { ScheduleDetailModal } from "@/components/event/schedule-detail-modal";
@@ -51,7 +51,7 @@ export function UpcomingListView({
   const [isCompact, setIsCompact] = React.useState(false);
 
   // Pagination States
-  const [rowsPerPage] = React.useState<number>(8);
+  const [rowsPerPage, setRowsPerPage] = React.useState<number>(DEFAULT_PAGE_SIZE);
   const [currentPage, setCurrentPage] = React.useState<number>(1);
 
   // Detail Modal State
@@ -159,11 +159,11 @@ export function UpcomingListView({
       });
   }, [events, searchQuery, filterCategory, sortOrder]);
 
-  const totalItems = filteredEvents.length;
-  const totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
-  const currentEvents = filteredEvents.slice(startIndex, endIndex);
+  const pagedEvents = paginateRows(filteredEvents, currentPage, rowsPerPage);
+  const totalItems = pagedEvents.totalItems;
+  const startIndex = pagedEvents.startIndex;
+  const endIndex = pagedEvents.endIndex;
+  const currentEvents = pagedEvents.items;
 
   const getEventCode = (evt: OvertimeEvent, index: number) => {
     const rawNumber = evt.id.replace(/\D/g, "").slice(-3) || (index + 1).toString().padStart(2, "0");
@@ -193,13 +193,13 @@ export function UpcomingListView({
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             placeholder="Cari jadwal kegiatan, agenda, atau teknisi..."
             className="w-full pl-9 pr-8 py-2 rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white text-xs text-zinc-900 placeholder-zinc-400 focus:outline-hidden focus:border-[#00A2E9] focus:ring-1 focus:ring-[#00A2E9] transition-all"
           />
           {searchQuery && (
             <button
-              onClick={() => setSearchQuery("")}
+              onClick={() => { setSearchQuery(""); setCurrentPage(1); }}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-zinc-200 text-zinc-400 cursor-pointer"
             >
               <X className="size-3.5" />
@@ -246,6 +246,7 @@ export function UpcomingListView({
                     type="button"
                     onClick={() => {
                       setFilterCategory(item.key);
+                      setCurrentPage(1);
                       setIsFilterOpen(false);
                     }}
                     className={`w-full text-left px-3.5 py-2 font-medium hover:bg-zinc-50 transition-colors cursor-pointer flex items-center justify-between ${
@@ -454,36 +455,20 @@ export function UpcomingListView({
       </div>
 
       {/* Pagination Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-zinc-100 text-xs text-zinc-500">
+      <div className="space-y-3 border-t border-zinc-100 pt-4 text-xs text-zinc-500">
         <div>
           Menampilkan <strong className="text-zinc-800">{totalItems > 0 ? startIndex + 1 : 0}</strong> -{" "}
           <strong className="text-zinc-800">{endIndex}</strong> dari{" "}
           <strong className="text-zinc-800">{totalItems}</strong> jadwal kegiatan
         </div>
 
-        <div className="flex items-center gap-1.5 self-center sm:self-auto">
-          <button
-            type="button"
-            disabled={currentPage <= 1}
-            onClick={() => setCurrentPage(currentPage - 1)}
-            className="p-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-          >
-            <ChevronLeft className="size-4" />
-          </button>
-
-          <span className="px-3 py-1 text-xs font-semibold text-zinc-700">
-            Halaman {currentPage} dari {totalPages}
-          </span>
-
-          <button
-            type="button"
-            disabled={currentPage >= totalPages}
-            onClick={() => setCurrentPage(currentPage + 1)}
-            className="p-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-          >
-            <ChevronRight className="size-4" />
-          </button>
-        </div>
+        <TablePagination
+          page={pagedEvents.page}
+          totalPages={pagedEvents.totalPages}
+          pageSize={rowsPerPage}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(nextSize) => { setRowsPerPage(nextSize); setCurrentPage(1); }}
+        />
       </div>
 
       {/* Detail Modal */}

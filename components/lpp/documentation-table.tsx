@@ -6,8 +6,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DEFAULT_PAGE_SIZE, paginateRows } from "@/lib/pagination";
 import { PhotoPreview } from "./photo-form";
 import { formPhotoSlots, readFormField, type LppForm } from "@/lib/lpp/form";
 import { MAX_PHOTO_BYTES, PHOTO_TYPES } from "@/lib/lpp/photo-policy";
@@ -30,6 +32,8 @@ export function DocumentationTable({ form, workbook, edits, templateId, template
   const [editing, setEditing] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const slots = formPhotoSlots(form);
   const itemSlots = (id: string) => slots.filter((slot) => slot.itemId === id);
   const itemName = (item: LppForm["items"][number]) => readFormField(item.fields[0], workbook, edits);
@@ -48,6 +52,7 @@ export function DocumentationTable({ form, workbook, edits, templateId, template
     return (photos[slotId] ? `/api/lpp/photos/${photos[slotId]}` : `/api/lpp/templates/${templateId}/photos/${slotId}`) + (thumbnail ? "?thumbnail=1" : "");
   };
   const visible = form.items.filter((item) => `${item.number} ${itemName(item)} ${location(item)}`.toLowerCase().includes(search.trim().toLowerCase()) && (filter !== "updated" || itemSlots(item.id).some((slot) => photos[slot.id])));
+  const paged = paginateRows(visible, page, pageSize);
   const allSelected = visible.length > 0 && visible.every((item) => selected.includes(item.id));
   const someSelected = visible.some((item) => selected.includes(item.id));
   const selectedChanges = slots.filter((slot) => selected.includes(slot.itemId) && photos[slot.id]);
@@ -70,8 +75,8 @@ export function DocumentationTable({ form, workbook, edits, templateId, template
     </div>
     {!showEditor && form.reportHeader && <p className="text-xs text-zinc-500">{watermark ? <>Watermark pada setiap foto ekspor: <span className="font-medium text-pln-navy">{watermark}</span></> : "Isi tanggal laporan untuk menampilkan watermark foto."}</p>}
     <div className="flex flex-wrap items-center gap-2">
-      {!showEditor && <><div className="relative min-w-48 flex-1 sm:max-w-sm"><Search className="absolute left-3 top-2.5 size-4 text-zinc-400" /><Input aria-label="Cari material atau lokasi" placeholder="Cari material atau lokasi…" className="h-9 pl-9" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
-      <select aria-label="Filter foto dokumentasi" className="h-9 rounded-md border bg-white px-3 text-sm" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">Semua foto</option><option value="updated">Foto diperbarui</option></select>
+      {!showEditor && <><div className="relative min-w-48 flex-1 sm:max-w-sm"><Search className="absolute left-3 top-2.5 size-4 text-zinc-400" /><Input aria-label="Cari material atau lokasi" placeholder="Cari material atau lokasi…" className="h-9 pl-9" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
+      <select aria-label="Filter foto dokumentasi" className="h-9 rounded-md border bg-white px-3 text-sm" value={filter} onChange={(event) => { setFilter(event.target.value); setPage(1); }}><option value="all">Semua foto</option><option value="updated">Foto diperbarui</option></select>
       {selected.length > 0 && <><span className="text-xs text-zinc-500">{selected.length} material dipilih</span><Button variant="outline" disabled={busy || !selectedChanges.length} onClick={() => reset(selectedChanges.map((slot) => slot.id))}><RotateCcw className="size-4" />Pulihkan pilihan</Button></>}
       </>}
       <Button variant="outline" className="h-9" disabled={busy} aria-expanded={showEditor} aria-controls={contentId} onClick={onToggleEditor}><FileSpreadsheet className="size-4" />{showEditor ? "Tutup editor data laporan" : "Edit data laporan"}</Button>
@@ -83,7 +88,7 @@ export function DocumentationTable({ form, workbook, edits, templateId, template
         <TableHead className="w-10 pl-3"><Checkbox aria-label="Pilih semua material yang terlihat" disabled={busy || !visible.length} checked={allSelected} indeterminate={!allSelected && someSelected} onCheckedChange={(checked) => setSelected((current) => checked ? [...new Set([...current, ...visible.map((item) => item.id)])] : current.filter((id) => !visible.some((item) => item.id === id)))} /></TableHead>
         <TableHead>Material</TableHead><TableHead>Lokasi pemasangan</TableHead><TableHead>Foto terbaru</TableHead><TableHead className="pr-3 text-right">Aksi</TableHead>
       </TableRow></TableHeader>
-      <TableBody>{visible.map((item) => {
+      <TableBody>{paged.items.map((item) => {
         const images = itemSlots(item.id), changed = images.filter((slot) => photos[slot.id]).length;
         const allBlank = images.every((slot) => slot.hasTemplatePhoto === false);
         const statusLabel = changed ? `${changed}/${images.length} diperbarui` : allBlank ? "Belum ada foto" : "Foto template";
@@ -105,7 +110,15 @@ export function DocumentationTable({ form, workbook, edits, templateId, template
         </TableRow>;
       })}{!visible.length && <TableRow><TableCell colSpan={5} className="py-10 text-center text-zinc-500">Tidak ada material yang sesuai pencarian atau filter.</TableCell></TableRow>}</TableBody>
     </Table></div>
-    <div className="flex flex-wrap justify-between gap-2 text-xs text-zinc-500"><span>{visible.length} dari {form.items.length} material</span><span>{slots.filter((slot) => photos[slot.id]).length} foto diperbarui · Foto dan ekspor hanya untuk pengguna yang diizinkan.</span></div>
+    <div className="flex flex-wrap justify-between gap-2 text-xs text-zinc-500"><span>Menampilkan {paged.totalItems ? paged.startIndex + 1 : 0}–{paged.endIndex} dari {form.items.length} material</span><span>{slots.filter((slot) => photos[slot.id]).length} foto diperbarui · Foto dan ekspor hanya untuk pengguna yang diizinkan.</span></div>
+    <TablePagination
+      page={paged.page}
+      totalPages={paged.totalPages}
+      pageSize={pageSize}
+      disabled={busy}
+      onPageChange={setPage}
+      onPageSizeChange={(nextSize) => { setPageSize(nextSize); setPage(1); }}
+    />
     {!activeItem && message && <p role="status" className="text-sm text-pln-navy">{message}</p>}
     </>}</div>
     <Dialog open={Boolean(activeItem)} onOpenChange={(open) => { if (!open && !busy) setActive(null); }}>

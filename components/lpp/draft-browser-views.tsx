@@ -1,8 +1,11 @@
 "use client";
 
+import * as React from "react";
 import { ChevronRight, Download, FileSpreadsheet, Folder, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DEFAULT_PAGE_SIZE, paginateRows } from "@/lib/pagination";
 import {
   draftDisplayTitle,
   draftExportLabel,
@@ -63,62 +66,78 @@ export function FolderCollectionView({
   busy: boolean;
   onOpenFolder: (folder: DraftFolder) => void;
 }) {
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(DEFAULT_PAGE_SIZE);
+
   if (viewMode === "details") {
+    const paged = paginateRows(folders, page, pageSize);
     return (
-      <Table aria-label="Detail folder draf LPP">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="pl-5">Nama folder</TableHead>
-            <TableHead>Jumlah file</TableHead>
-            <TableHead>Perubahan total</TableHead>
-            <TableHead>Laporan terbaru</TableHead>
-            <TableHead>Terakhir disimpan</TableHead>
-            <TableHead className="pr-5">Bulan</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {folders.map((folder) => (
-            <TableRow
-              key={folder.id}
-              onClick={() => !busy && onOpenFolder(folder)}
-              className="cursor-pointer hover:bg-pln-ice/40"
-            >
-              <TableCell className="pl-5">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenFolder(folder);
-                  }}
-                  className="flex items-center gap-2.5 rounded-sm text-left font-medium text-pln-navy hover:underline focus-visible:outline-2 focus-visible:outline-pln-cyan disabled:opacity-50"
-                >
-                  <Folder className="size-4 shrink-0 fill-pln-cyan/25 text-pln-navy" />
-                  <span className="max-w-72 truncate">{folder.name}</span>
-                  {!folder.available && (
-                    <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] font-normal text-zinc-500">
-                      Arsip
-                    </span>
-                  )}
-                </button>
-              </TableCell>
-              <TableCell className="text-sm text-pln-charcoal">{folder.drafts.length} file</TableCell>
-              <TableCell className="text-xs text-zinc-600">
-                {folder.totalChanges} sel · {folder.totalPhotos} foto
-              </TableCell>
-              <TableCell className="text-sm text-pln-charcoal">
-                {formatReportDate(folder.latestReportDate)}
-              </TableCell>
-              <TableCell className="text-xs text-zinc-500">
-                {formatDraftUpdatedAt(folder.latestUpdatedAt)}
-              </TableCell>
-              <TableCell className="pr-5">
-                <MonthBadges folder={folder} limit={2} />
-              </TableCell>
+      <div>
+        <Table aria-label="Detail folder draf LPP">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="pl-5">Nama folder</TableHead>
+              <TableHead>Jumlah file</TableHead>
+              <TableHead>Perubahan total</TableHead>
+              <TableHead>Laporan terbaru</TableHead>
+              <TableHead>Terakhir disimpan</TableHead>
+              <TableHead className="pr-5">Bulan</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {paged.items.map((folder) => (
+              <TableRow
+                key={folder.id}
+                onClick={() => !busy && onOpenFolder(folder)}
+                className="cursor-pointer hover:bg-pln-ice/40"
+              >
+                <TableCell className="pl-5">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenFolder(folder);
+                    }}
+                    className="flex items-center gap-2.5 rounded-sm text-left font-medium text-pln-navy hover:underline focus-visible:outline-2 focus-visible:outline-pln-cyan disabled:opacity-50"
+                  >
+                    <Folder className="size-4 shrink-0 fill-pln-cyan/25 text-pln-navy" />
+                    <span className="max-w-72 truncate">{folder.name}</span>
+                    {!folder.available && (
+                      <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] font-normal text-zinc-500">
+                        Arsip
+                      </span>
+                    )}
+                  </button>
+                </TableCell>
+                <TableCell className="text-sm text-pln-charcoal">{folder.drafts.length} file</TableCell>
+                <TableCell className="text-xs text-zinc-600">
+                  {folder.totalChanges} sel · {folder.totalPhotos} foto
+                </TableCell>
+                <TableCell className="text-sm text-pln-charcoal">
+                  {formatReportDate(folder.latestReportDate)}
+                </TableCell>
+                <TableCell className="text-xs text-zinc-500">
+                  {formatDraftUpdatedAt(folder.latestUpdatedAt)}
+                </TableCell>
+                <TableCell className="pr-5">
+                  <MonthBadges folder={folder} limit={2} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <div className="border-t px-5 py-3">
+          <TablePagination
+            page={paged.page}
+            totalPages={paged.totalPages}
+            pageSize={pageSize}
+            disabled={busy}
+            onPageChange={setPage}
+            onPageSizeChange={(nextSize) => { setPageSize(nextSize); setPage(1); }}
+          />
+        </div>
+      </div>
     );
   }
 
@@ -319,67 +338,82 @@ export function FolderFilesView({
   onExport: (draft: DraftSummary) => void;
   onDelete: (draft: DraftSummary) => void;
 }) {
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(DEFAULT_PAGE_SIZE);
   const templateName = folder.available ? folder.name : undefined;
 
   if (viewMode === "details") {
+    const paged = paginateRows(drafts, page, pageSize);
     return (
-      <Table aria-label={`Daftar file di folder ${folder.name}`}>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="pl-5">Nama file</TableHead>
-            <TableHead>Tanggal laporan</TableHead>
-            <TableHead>Ringkasan</TableHead>
-            <TableHead>Diperbarui</TableHead>
-            <TableHead className="pr-5 text-right">Aksi</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {drafts.map((draft) => {
-            const title = draftDisplayTitle(draft, templateName);
-            const exportName = draftExportLabel(draft, templateName);
-            const date = resolveReportDate(draft);
-            const photoCount = draft.photoCount ?? Object.keys(draft.photos ?? {}).length;
-            return (
-              <TableRow key={draft.id}>
-                <TableCell className="pl-5">
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => onOpen(draft)}
-                    className="flex w-full max-w-md flex-col items-start gap-0.5 rounded-sm text-left focus-visible:outline-2 focus-visible:outline-pln-cyan disabled:opacity-50"
-                  >
-                    <span className="flex w-full min-w-0 items-center gap-2 font-medium text-pln-navy hover:underline">
-                      <FileSpreadsheet className="size-4 shrink-0 text-pln-cyan" />
-                      <span className="truncate">{title}</span>
-                    </span>
-                    <span className="w-full truncate pl-6 text-xs text-zinc-500">{exportName}</span>
-                  </button>
-                </TableCell>
-                <TableCell>
-                  <time dateTime={date}>{formatReportDate(date)}</time>
-                </TableCell>
-                <TableCell className="text-xs text-zinc-500">
-                  {draft.changes ?? 0} sel · {photoCount} foto
-                </TableCell>
-                <TableCell className="text-xs text-zinc-500">
-                  {formatDraftUpdatedAt(draft.updatedAt)}
-                </TableCell>
-                <TableCell className="pr-5">
-                  <DraftFileActions
-                    title={title}
-                    date={date}
-                    busy={busy}
-                    available={folder.available}
-                    onOpen={() => onOpen(draft)}
-                    onExport={() => onExport(draft)}
-                    onDelete={() => onDelete(draft)}
-                  />
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+      <div>
+        <Table aria-label={`Daftar file di folder ${folder.name}`}>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="pl-5">Nama file</TableHead>
+              <TableHead>Tanggal laporan</TableHead>
+              <TableHead>Ringkasan</TableHead>
+              <TableHead>Diperbarui</TableHead>
+              <TableHead className="pr-5 text-right">Aksi</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paged.items.map((draft) => {
+              const title = draftDisplayTitle(draft, templateName);
+              const exportName = draftExportLabel(draft, templateName);
+              const date = resolveReportDate(draft);
+              const photoCount = draft.photoCount ?? Object.keys(draft.photos ?? {}).length;
+              return (
+                <TableRow key={draft.id}>
+                  <TableCell className="pl-5">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => onOpen(draft)}
+                      className="flex w-full max-w-md flex-col items-start gap-0.5 rounded-sm text-left focus-visible:outline-2 focus-visible:outline-pln-cyan disabled:opacity-50"
+                    >
+                      <span className="flex w-full min-w-0 items-center gap-2 font-medium text-pln-navy hover:underline">
+                        <FileSpreadsheet className="size-4 shrink-0 text-pln-cyan" />
+                        <span className="truncate">{title}</span>
+                      </span>
+                      <span className="w-full truncate pl-6 text-xs text-zinc-500">{exportName}</span>
+                    </button>
+                  </TableCell>
+                  <TableCell>
+                    <time dateTime={date}>{formatReportDate(date)}</time>
+                  </TableCell>
+                  <TableCell className="text-xs text-zinc-500">
+                    {draft.changes ?? 0} sel · {photoCount} foto
+                  </TableCell>
+                  <TableCell className="text-xs text-zinc-500">
+                    {formatDraftUpdatedAt(draft.updatedAt)}
+                  </TableCell>
+                  <TableCell className="pr-5">
+                    <DraftFileActions
+                      title={title}
+                      date={date}
+                      busy={busy}
+                      available={folder.available}
+                      onOpen={() => onOpen(draft)}
+                      onExport={() => onExport(draft)}
+                      onDelete={() => onDelete(draft)}
+                    />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+        <div className="border-t px-5 py-3">
+          <TablePagination
+            page={paged.page}
+            totalPages={paged.totalPages}
+            pageSize={pageSize}
+            disabled={busy}
+            onPageChange={setPage}
+            onPageSizeChange={(nextSize) => { setPageSize(nextSize); setPage(1); }}
+          />
+        </div>
+      </div>
     );
   }
 

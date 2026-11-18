@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { DEFAULT_PAGE_SIZE, paginateRows } from "@/lib/pagination";
 import { OvertimeApiResponse } from "@/types/event";
 
 interface LeaderboardTabProps {
@@ -10,6 +12,9 @@ interface LeaderboardTabProps {
 }
 
 export function LeaderboardTab({ data, onOpenManageTeam, onOpenAddSchedule }: LeaderboardTabProps) {
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(DEFAULT_PAGE_SIZE);
+  const pagedMembers = paginateRows(data.rankedMembers, page, pageSize);
   return (
     <div className="space-y-6">
       {/* Fair Ranking Recommendation Banner */}
@@ -122,7 +127,7 @@ export function LeaderboardTab({ data, onOpenManageTeam, onOpenAddSchedule }: Le
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 bg-white text-zinc-700">
-              {data.rankedMembers.map((m) => {
+              {pagedMembers.items.map((m) => {
                 const isTopTwo = m.rank <= 2;
                 return (
                   <tr key={m.id} className={isTopTwo ? "bg-sky-50/30 font-medium" : "hover:bg-zinc-50/70 transition-colors"}>
@@ -170,6 +175,14 @@ export function LeaderboardTab({ data, onOpenManageTeam, onOpenAddSchedule }: Le
             </tbody>
           </table>
         </div>
+        <TablePagination
+          className="mt-4"
+          page={pagedMembers.page}
+          totalPages={pagedMembers.totalPages}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(nextSize) => { setPageSize(nextSize); setPage(1); }}
+        />
       </div>
     </div>
   );

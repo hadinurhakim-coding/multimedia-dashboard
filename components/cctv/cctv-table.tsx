@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { DEFAULT_PAGE_SIZE, paginateRows } from "@/lib/pagination";
 
 interface CCTVTableProps {
   cctvList: CCTVUnit[];
@@ -31,6 +33,8 @@ export function CCTVTable({
 }: CCTVTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedSN, setCopiedSN] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const filteredCCTV = useMemo(() => {
     return cctvList.filter((item) => {
@@ -45,6 +49,7 @@ export function CCTVTable({
       );
     });
   }, [cctvList, searchQuery]);
+  const paged = paginateRows(filteredCCTV, page, pageSize);
 
   const handleCopySN = (sn: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -77,7 +82,7 @@ export function CCTVTable({
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
             placeholder="Cari SN, lokasi, atau mitra..."
             className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#00A2E9] focus:border-[#00A2E9] transition-all"
           />
@@ -100,7 +105,7 @@ export function CCTVTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100">
-            {filteredCCTV.map((cctv) => {
+            {paged.items.map((cctv) => {
               const isSelected = cctv.id === selectedCCTVId;
 
               return (
@@ -254,6 +259,15 @@ export function CCTVTable({
             )}
           </tbody>
         </table>
+      </div>
+      <div className="border-t border-zinc-200/80 px-4 py-3">
+        <TablePagination
+          page={paged.page}
+          totalPages={paged.totalPages}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(nextSize) => { setPageSize(nextSize); setPage(1); }}
+        />
       </div>
     </div>
   );

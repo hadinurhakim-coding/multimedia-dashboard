@@ -6,9 +6,11 @@ import { PhotoForm } from "./photo-form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DEFAULT_PAGE_SIZE, paginateRows } from "@/lib/pagination";
 import { editKey, fieldEdits, formErrors, readFormField, type LppForm, type LppFormField } from "@/lib/lpp/form";
 import type { CellEdit, LppPhotos, LppWorkbook } from "@/types/lpp";
 
@@ -32,6 +34,8 @@ export function InstallationForm({ form, workbook, edits, busy, showErrors, onCh
   templateId: string; photos: LppPhotos; onUploadPhoto: (itemId: string, file: File) => Promise<void>; onResetPhoto: (itemId: string) => void;
 }) {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [editing, setEditing] = useState<LppForm["items"][number] | null>(null);
   const [pending, setPending] = useState<Record<string, string>>({});
   const [dialogErrors, setDialogErrors] = useState<Record<string, string>>({});
@@ -39,6 +43,7 @@ export function InstallationForm({ form, workbook, edits, busy, showErrors, onCh
   const value = (field: LppFormField) => readFormField(field, workbook, edits);
   const field = (item: LppFormField) => <FormControl key={item.id} field={item} value={value(item)} disabled={busy} error={showErrors ? errors[item.id] : undefined} onChange={(next) => onChange(fieldEdits(item, next))} />;
   const filtered = form.items.filter((item) => item.fields.some((f) => value(f).toLowerCase().includes(search.toLowerCase())));
+  const paged = paginateRows(filtered, page, pageSize);
   const completed = form.items.filter((item) => !item.fields.some((f) => errors[f.id])).length;
   function openItem(item: LppForm["items"][number]) {
     setPending(Object.fromEntries(item.fields.map((f) => [f.id, value(f)]))); setDialogErrors({}); setEditing(item);
@@ -67,9 +72,9 @@ export function InstallationForm({ form, workbook, edits, busy, showErrors, onCh
     <Card className="shadow-none">
       <CardHeader><CardTitle className="text-base text-pln-navy">2. Rincian perangkat</CardTitle><CardDescription>Periksa perangkat yang tercantum. Gunakan Edit untuk mengubah deskripsi, nomor seri, status, dan lokasi pemasangan.</CardDescription></CardHeader>
       <CardContent className="space-y-4">
-        <div className="relative max-w-sm"><Search className="absolute left-3 top-3 size-4 text-zinc-400" /><Input className="h-10 pl-9" aria-label="Cari perangkat" placeholder="Cari nama, nomor seri, atau lokasi…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+        <div className="relative max-w-sm"><Search className="absolute left-3 top-3 size-4 text-zinc-400" /><Input className="h-10 pl-9" aria-label="Cari perangkat" placeholder="Cari nama, nomor seri, atau lokasi…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} /></div>
         <div className="overflow-hidden rounded-lg border"><Table><TableHeader><TableRow><TableHead className="w-12">No.</TableHead><TableHead>Perangkat</TableHead><TableHead>Nomor seri</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Aksi</TableHead></TableRow></TableHeader><TableBody>
-          {filtered.map((item) => <TableRow key={item.id}>
+          {paged.items.map((item) => <TableRow key={item.id}>
             <TableCell className="align-top text-zinc-500">{item.number}</TableCell>
             <TableCell className="min-w-52 max-w-md whitespace-normal"><p className="font-medium">{value(item.fields[0]) || "Nama perangkat belum diisi"}</p><p className="mt-1 text-xs text-zinc-500">{value(item.fields[3]) || "Lokasi belum diisi"}</p>{showErrors && item.fields.some((f) => errors[f.id]) && <p className="mt-1 text-xs text-red-700">Lengkapi data perangkat ini.</p>}</TableCell>
             <TableCell className="max-w-40 whitespace-normal break-all text-zinc-600">{value(item.fields[1]) || "—"}</TableCell>
@@ -78,6 +83,14 @@ export function InstallationForm({ form, workbook, edits, busy, showErrors, onCh
           </TableRow>)}
           {!filtered.length && <TableRow><TableCell colSpan={5} className="py-8 text-center text-zinc-500">Tidak ada perangkat yang cocok.</TableCell></TableRow>}
         </TableBody></Table></div>
+        <TablePagination
+          page={paged.page}
+          totalPages={paged.totalPages}
+          pageSize={pageSize}
+          disabled={busy}
+          onPageChange={setPage}
+          onPageSizeChange={(nextSize) => { setPageSize(nextSize); setPage(1); }}
+        />
         <p className="text-xs leading-relaxed text-zinc-500">Jumlah dan urutan perangkat mengikuti template. Foto setiap perangkat dapat diganti pada bagian dokumentasi di bawah.</p>
       </CardContent>
     </Card>
