@@ -4,15 +4,19 @@ import * as React from "react";
 import {
   ArrowLeft,
   ChevronRight,
+  Download,
   FileSpreadsheet,
   Folder,
   FolderOpen,
+  Loader2,
   Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { DraftViewMenu } from "@/components/lpp/draft-view-menu";
 import { FolderCollectionView, FolderFilesView } from "@/components/lpp/draft-browser-views";
+import { summarizeSelection, toggleSelectionSet } from "@/lib/lpp/bulk-export";
 import {
   buildDraftFolders,
   DEFAULT_FILE_VIEW_MODE,
@@ -78,6 +82,7 @@ export function DraftsPage({
   drafts,
   templates,
   busy,
+  exportingBulk = false,
   folderId,
   onFolderChange,
   monthFilter: controlledMonthFilter,
@@ -85,11 +90,13 @@ export function DraftsPage({
   onBack,
   onOpen,
   onExport,
+  onBulkExport,
   onDelete,
 }: {
   drafts: DraftSummary[];
   templates: LppTemplate[];
   busy: boolean;
+  exportingBulk?: boolean;
   folderId?: string | null;
   onFolderChange?: (folderId: string | null) => void;
   monthFilter?: string;
@@ -97,10 +104,13 @@ export function DraftsPage({
   onBack: () => void;
   onOpen: (draft: DraftSummary) => void;
   onExport: (draft: DraftSummary) => void;
+  onBulkExport: (drafts: DraftSummary[], folderName?: string | null) => void;
   onDelete: (draft: DraftSummary) => void;
 }) {
   const [internalFolderId, setInternalFolderId] = React.useState<string | null>(null);
   const [internalMonthFilter, setInternalMonthFilter] = React.useState<string>("all");
+  const [selectedFolderIdsRaw, setSelectedFolderIdsRaw] = React.useState<ReadonlySet<string>>(() => new Set());
+  const [selectedDraftIdsRaw, setSelectedDraftIdsRaw] = React.useState<ReadonlySet<string>>(() => new Set());
   const selectedFolderId = folderId !== undefined ? folderId : internalFolderId;
   const setSelectedFolderId = (next: string | null) => {
     if (onFolderChange) onFolderChange(next);
@@ -156,14 +166,50 @@ export function DraftsPage({
     );
   }, [activeFolder, monthFilter, searchQuery]);
 
+  const exportableFolders = React.useMemo(
+    () => folders.filter((folder) => folder.available && folder.drafts.length > 0),
+    [folders]
+  );
+  const visibleExportableFolderIds = React.useMemo(
+    () => visibleFolders.filter((folder) => folder.available && folder.drafts.length > 0).map((folder) => folder.id),
+    [visibleFolders]
+  );
+  const selectedFolderIds = React.useMemo(() => {
+    const validIds = new Set(exportableFolders.map((folder) => folder.id));
+    return new Set([...selectedFolderIdsRaw].filter((id) => validIds.has(id)));
+  }, [exportableFolders, selectedFolderIdsRaw]);
+  const selectedFolderDrafts = React.useMemo(
+    () => exportableFolders.filter((folder) => selectedFolderIds.has(folder.id)).flatMap((folder) => folder.drafts),
+    [exportableFolders, selectedFolderIds]
+  );
+  const folderSelection = summarizeSelection(selectedFolderIds, visibleExportableFolderIds);
+
+  const selectedDraftIds = React.useMemo(() => {
+    if (!activeFolder || !activeFolder.available) return new Set<string>();
+    const validIds = new Set(activeFolder.drafts.map((item) => item.id));
+    return new Set([...selectedDraftIdsRaw].filter((id) => validIds.has(id)));
+  }, [activeFolder, selectedDraftIdsRaw]);
+  const selectedFileDrafts = React.useMemo(() => {
+    if (!activeFolder || !activeFolder.available) return [];
+    return activeFolder.drafts.filter((item) => selectedDraftIds.has(item.id));
+  }, [activeFolder, selectedDraftIds]);
+  const visibleExportableDraftIds = React.useMemo(
+    () => (activeFolder?.available ? visibleFolderDrafts.map((item) => item.id) : []),
+    [activeFolder, visibleFolderDrafts]
+  );
+  const fileSelection = summarizeSelection(selectedDraftIds, visibleExportableDraftIds);
+
   function openFolder(folder: DraftFolder) {
     setSelectedFolderId(folder.id);
+    setSelectedFolderIdsRaw(new Set());
+    setSelectedDraftIdsRaw(new Set());
     setMonthFilter("all");
     setSearchQuery("");
   }
 
   function returnToFolders() {
     setSelectedFolderId(null);
+    setSelectedDraftIdsRaw(new Set());
     setMonthFilter("all");
     setSearchQuery("");
   }
@@ -267,27 +313,74 @@ export function DraftsPage({
               <p className="font-medium text-pln-charcoal">Folder atau laporan tidak ditemukan</p>
               <p className="text-sm text-zinc-500">Coba kata kunci lain atau bersihkan pencarian.</p>
             </div>
-          ) : folderView === "details" ? (
-            <FolderCollectionView
-              folders={visibleFolders}
-              viewMode={folderView}
-              busy={busy}
-              onOpenFolder={openFolder}
-            />
           ) : (
-            <div className="space-y-4 p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Folder Template
-                </h2>
-                <span className="text-xs text-zinc-400">Klik folder untuk membuka file di dalamnya</span>
-              </div>
-              <FolderCollectionView
-                folders={visibleFolders}
-                viewMode={folderView}
-                busy={busy}
-                onOpenFolder={openFolder}
+            <div>
+              <BulkExportBar
+                selectAllLabel={`Pilih semua folder (${visibleExportableFolderIds.length})`}
+                allSelected={folderSelection.allVisibleSelected}
+                someSelected={folderSelection.someVisibleSelected}
+                selectedCount={selectedFolderDrafts.length}
+                selectionText={
+                  selectedFolderIds.size > 0
+                    ? `${selectedFolderIds.size} folder (${selectedFolderDrafts.length} file) dipilih`
+                    : ""
+                }
+                disabled={busy || !visibleExportableFolderIds.length}
+                exportDisabled={busy || !selectedFolderDrafts.length}
+                exporting={exportingBulk}
+                hint={!exportableFolders.length ? "Template folder belum tersedia untuk ekspor." : undefined}
+                onToggleAll={(checked) =>
+                  setSelectedFolderIdsRaw((current) =>
+                    toggleSelectionSet(current, visibleExportableFolderIds, checked)
+                  )
+                }
+                onClear={() => setSelectedFolderIdsRaw(new Set())}
+                onExport={() =>
+                  onBulkExport(
+                    selectedFolderDrafts,
+                    selectedFolderIds.size === 1
+                      ? exportableFolders.find((folder) => selectedFolderIds.has(folder.id))?.name ?? null
+                      : null
+                  )
+                }
               />
+              {folderView === "details" ? (
+                <FolderCollectionView
+                  folders={visibleFolders}
+                  viewMode={folderView}
+                  busy={busy}
+                  selectedFolderIds={selectedFolderIds}
+                  onToggleFolder={(id, checked) =>
+                    setSelectedFolderIdsRaw((current) => toggleSelectionSet(current, [id], checked))
+                  }
+                  onToggleFolders={(ids, checked) =>
+                    setSelectedFolderIdsRaw((current) => toggleSelectionSet(current, ids, checked))
+                  }
+                  onOpenFolder={openFolder}
+                />
+              ) : (
+                <div className="space-y-4 p-5">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                      Folder Template
+                    </h2>
+                    <span className="text-xs text-zinc-400">Klik folder untuk membuka file di dalamnya</span>
+                  </div>
+                  <FolderCollectionView
+                    folders={visibleFolders}
+                    viewMode={folderView}
+                    busy={busy}
+                    selectedFolderIds={selectedFolderIds}
+                    onToggleFolder={(id, checked) =>
+                      setSelectedFolderIdsRaw((current) => toggleSelectionSet(current, [id], checked))
+                    }
+                    onToggleFolders={(ids, checked) =>
+                      setSelectedFolderIdsRaw((current) => toggleSelectionSet(current, ids, checked))
+                    }
+                    onOpenFolder={openFolder}
+                  />
+                </div>
+              )}
             </div>
           )
         ) : (
@@ -340,19 +433,147 @@ export function DraftsPage({
                 <p className="text-sm text-zinc-500">Ubah filter bulan atau kata kunci pencarian.</p>
               </div>
             ) : (
-              <FolderFilesView
-                folder={activeFolder}
-                drafts={visibleFolderDrafts}
-                viewMode={fileView}
-                busy={busy}
-                onOpen={onOpen}
-                onExport={onExport}
-                onDelete={onDelete}
-              />
+              <div>
+                <BulkExportBar
+                  selectAllLabel={`Pilih semua (${visibleExportableDraftIds.length})`}
+                  allSelected={fileSelection.allVisibleSelected}
+                  someSelected={fileSelection.someVisibleSelected}
+                  selectedCount={selectedFileDrafts.length}
+                  selectionText={
+                    selectedFileDrafts.length > 0 ? `${selectedFileDrafts.length} file dipilih` : ""
+                  }
+                  disabled={busy || !visibleExportableDraftIds.length}
+                  exportDisabled={busy || !activeFolder.available || !selectedFileDrafts.length}
+                  exporting={exportingBulk}
+                  hint={!activeFolder.available ? "Template folder tidak tersedia — ekspor dinonaktifkan." : undefined}
+                  onToggleAll={(checked) =>
+                    setSelectedDraftIdsRaw((current) =>
+                      toggleSelectionSet(current, visibleExportableDraftIds, checked)
+                    )
+                  }
+                  onClear={() => setSelectedDraftIdsRaw(new Set())}
+                  onExport={() => onBulkExport(selectedFileDrafts, activeFolder.name)}
+                />
+                <FolderFilesView
+                  folder={activeFolder}
+                  drafts={visibleFolderDrafts}
+                  viewMode={fileView}
+                  busy={busy}
+                  selectedDraftIds={selectedDraftIds}
+                  onToggleDraft={(id, checked) =>
+                    setSelectedDraftIdsRaw((current) => toggleSelectionSet(current, [id], checked))
+                  }
+                  onToggleDrafts={(ids, checked) =>
+                    setSelectedDraftIdsRaw((current) => toggleSelectionSet(current, ids, checked))
+                  }
+                  onOpen={onOpen}
+                  onExport={onExport}
+                  onDelete={onDelete}
+                />
+              </div>
             )}
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function BulkExportBar({
+  selectAllLabel,
+  allSelected,
+  someSelected,
+  selectedCount,
+  selectionText,
+  disabled,
+  exportDisabled,
+  exporting,
+  hint,
+  onToggleAll,
+  onClear,
+  onExport,
+}: {
+  selectAllLabel: string;
+  allSelected: boolean;
+  someSelected: boolean;
+  selectedCount: number;
+  selectionText: string;
+  disabled: boolean;
+  exportDisabled: boolean;
+  exporting: boolean;
+  hint?: string;
+  onToggleAll: (checked: boolean) => void;
+  onClear: () => void;
+  onExport: () => void;
+}) {
+  const selectAllId = React.useId();
+  return (
+    <div
+      data-slot="bulk-export-bar"
+      className="flex flex-wrap items-center justify-between gap-3 border-b bg-zinc-50/80 px-5 py-2.5"
+    >
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={selectAllId}
+            checked={allSelected}
+            indeterminate={someSelected}
+            disabled={disabled}
+            onCheckedChange={onToggleAll}
+          />
+          <label
+            htmlFor={selectAllId}
+            className="cursor-pointer select-none text-xs font-medium text-pln-charcoal"
+          >
+            {selectAllLabel}
+          </label>
+        </div>
+        {selectionText && (
+          <div className="flex items-center gap-1.5">
+            <span className="rounded-full bg-pln-cyan/15 px-2.5 py-0.5 text-xs font-semibold text-pln-navy">
+              {selectionText}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              disabled={disabled}
+              onClick={onClear}
+            >
+              Bersihkan
+            </Button>
+          </div>
+        )}
+        {hint && <span className="text-xs text-zinc-500">{hint}</span>}
+      </div>
+
+      <Button
+        type="button"
+        size="sm"
+        variant={selectedCount > 0 ? "default" : "outline"}
+        disabled={exportDisabled}
+        aria-busy={exporting}
+        title={
+          selectedCount > 1
+            ? `Unduh ${selectedCount} file Excel terpilih dalam satu arsip ZIP`
+            : selectedCount === 1
+              ? "Unduh 1 file Excel terpilih"
+              : "Pilih minimal 1 item untuk ekspor Excel"
+        }
+        className={selectedCount > 0 ? "bg-pln-navy text-white hover:bg-pln-navy/90" : "text-pln-navy"}
+        onClick={onExport}
+      >
+        {exporting ? (
+          <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+        ) : (
+          <Download className="size-3.5" aria-hidden="true" />
+        )}
+        {exporting
+          ? "Mengekspor…"
+          : selectedCount > 0
+            ? `Ekspor Excel (${selectedCount})`
+            : "Ekspor Excel masal"}
+      </Button>
     </div>
   );
 }

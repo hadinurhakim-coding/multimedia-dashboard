@@ -19,7 +19,8 @@ import { ReportHeader } from "./report-header";
 import { DraftsPage } from "./drafts-page";
 import { TemplateCatalogTable } from "./template-catalog-table";
 import { buildLppBreadcrumbItems, type LppBreadcrumbAction } from "@/lib/lpp/breadcrumb";
-import { buildDraftFolders } from "@/lib/lpp/draft-folders";
+import { bulkExportArchiveName, parseExportFilename, uniqueZipEntryName } from "@/lib/lpp/bulk-export";
+import { buildDraftFolders, type DraftSummary } from "@/lib/lpp/draft-folders";
 import { formErrors, type LppForm } from "@/lib/lpp/form";
 import { applyReportDate, resolveReportDate, validateReportDate } from "@/lib/lpp/report-date";
 import { templateDisplayName } from "@/lib/lpp/naming";
@@ -36,6 +37,11 @@ type Document = LppWorkbook & LppTemplate & { form: LppForm | null; defaultRepor
 const col = (n: number): string => n > 26 ? col(Math.floor((n - 1) / 26)) + col((n - 1) % 26 + 1) : String.fromCharCode(64 + n);
 const point = (a: string) => ({ row: Number(a.match(/\d+/)![0]), column: [...a.match(/[A-Z]+/)![0]].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0) });
 const key = (sheet: string, address: string) => JSON.stringify([sheet, address]);
+function triggerBlobDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob), link = window.document.createElement("a");
+  link.href = url; link.download = filename; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 export function LppView({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void }) {
   const user = useAppUser();
@@ -195,11 +201,68 @@ export function LppView({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => 
   async function downloadDraft(id: string) {
     const response = await api("/api/lpp/export", { method: "POST", body: JSON.stringify({ id }) });
     // The server names the file using the date and template of the saved draft.
-    const filename = decodeURIComponent(response.headers.get("Content-Disposition")?.match(/filename\*=UTF-8''([^;]+)/i)?.[1] ?? "LPP.xlsx");
-    const url = URL.createObjectURL(await response.blob()), link = window.document.createElement("a");
-    link.href = url; link.download = filename; link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const filename = parseExportFilename(response.headers.get("Content-Disposition"));
+    triggerBlobDownload(await response.blob(), filename);
     setMessage(`Excel berhasil diekspor: ${filename}`);
+  }
+  async function downloadDraftsBulk(items: DraftSummary[], folderName?: string | null) {
+    if (!items.length) return;
+    if (items.length === 1) {
+      setBusyLabel(`Mengekspor Excel: ${items[0].title || "LPP"}…`);
+      await downloadDraft(items[0].id);
+      return;
+    }
+    const { default: JSZip } = await import("jszip");
+    const zip = new JSZip();
+    const usedNames = new Set<string>();
+    let exportedCount = 0;
+    let firstSuccess: { filename: string; blob: Blob } | null = null;
+    const failures: string[] = [];
+
+    for (const [index, item] of items.entries()) {
+      const label = item.title?.trim() || "LPP";
+      setBusyLabel(`Mengekspor Excel (${index + 1}/${items.length}): ${label}…`);
+      try {
+        const response = await api("/api/lpp/export", { method: "POST", body: JSON.stringify({ id: item.id }) });
+        const rawName = parseExportFilename(response.headers.get("Content-Disposition"), `${label}.xlsx`);
+        const entryName = uniqueZipEntryName(rawName, usedNames);
+        const blob = await response.blob();
+        if (exportedCount === 0) firstSuccess = { filename: entryName, blob };
+        zip.file(entryName, await blob.arrayBuffer());
+        exportedCount++;
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "Gagal mengekspor.";
+        failures.push(`${label}: ${reason}`);
+        if (reason.includes("Terlalu banyak permintaan") || reason.includes("Sesi")) break;
+      }
+    }
+
+    if (exportedCount === 0) {
+      throw new Error(failures[0] ?? "Tidak ada file Excel yang berhasil diekspor.");
+    }
+    if (exportedCount === 1 && firstSuccess) {
+      triggerBlobDownload(firstSuccess.blob, firstSuccess.filename);
+      setMessage(
+        failures.length
+          ? `1 file Excel berhasil diekspor (${firstSuccess.filename}). ${failures.length} gagal: ${failures[0]}`
+          : `Excel berhasil diekspor: ${firstSuccess.filename}`
+      );
+      return;
+    }
+
+    setBusyLabel(`Mengemas ${exportedCount} file Excel ke ZIP…`);
+    const archiveBlob = await zip.generateAsync({
+      type: "blob",
+      compression: "DEFLATE",
+      compressionOptions: { level: 6 },
+    });
+    const archiveName = bulkExportArchiveName(folderName, exportedCount);
+    triggerBlobDownload(archiveBlob, archiveName);
+    setMessage(
+      failures.length
+        ? `${exportedCount} file Excel diekspor ke ${archiveName}. ${failures.length} dilewati (${failures[0]}).`
+        : `${exportedCount} file Excel berhasil diekspor ke ${archiveName}`
+    );
   }
   const sheet = document?.sheets[sheetIndex];
   async function uploadPhoto(itemId: string, file: File) {
@@ -317,7 +380,7 @@ export function LppView({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => 
       </div>
     </div>
     <p role="status" aria-live="polite" className="text-sm text-pln-navy">{busy ? busyLabel : message}</p>
-    {!catalog ? <div className="rounded-xl border bg-white p-6"><p className="text-sm text-zinc-500">{message ? "Daftar laporan belum dapat dimuat." : "Memuat laporan…"}</p>{message && <Button variant="outline" className="mt-3" disabled={busy} onClick={() => void run(refresh, "Memuat daftar…")}>Coba lagi</Button>}</div> : screen === "drafts" ? <DraftsPage drafts={catalog.drafts} templates={catalog.templates} busy={busy}
+    {!catalog ? <div className="rounded-xl border bg-white p-6"><p className="text-sm text-zinc-500">{message ? "Daftar laporan belum dapat dimuat." : "Memuat laporan…"}</p>{message && <Button variant="outline" className="mt-3" disabled={busy} onClick={() => void run(refresh, "Memuat daftar…")}>Coba lagi</Button>}</div> : screen === "drafts" ? <DraftsPage drafts={catalog.drafts} templates={catalog.templates} busy={busy} exportingBulk={busy && busyAction === "export"}
       folderId={draftsFolderId}
       onFolderChange={(folderId) => { setDraftsFolderId(folderId); setDraftsMonthFilter("all"); persistNav({ screen: "drafts", folderId, monthFilter: "all" }); }}
       monthFilter={draftsMonthFilter}
@@ -325,6 +388,7 @@ export function LppView({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => 
       onBack={returnToEditor}
       onOpen={(item) => void run(async () => { const detail = await (await api(`/api/lpp/drafts/${item.id}`)).json() as LppDraft; await open(detail.templateId, detail); }, "Membuka draf…")}
       onExport={(item) => void run(() => downloadDraft(item.id), "Mengekspor Excel…")}
+      onBulkExport={(items, folderName) => void run(() => downloadDraftsBulk(items, folderName), "Menyiapkan ekspor Excel masal…", "export")}
       onDelete={(item) => {
         if (!window.confirm("Hapus draf ini?")) return;
         void run(async () => {

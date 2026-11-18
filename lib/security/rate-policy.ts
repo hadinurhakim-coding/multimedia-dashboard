@@ -4,7 +4,7 @@ export const ratePolicies = {
   user: { limit: 300, window: 60, cooldown: 60 },
   loginClient: { limit: 20, window: 600, cooldown: 60 },
   loginAccount: { limit: 5, window: 600, cooldown: 60 },
-  export: { limit: 10, window: 300, cooldown: 60 },
+  export: { limit: 100, window: 300, cooldown: 60 },
   upload: { limit: 30, window: 300, cooldown: 60 },
   write: { limit: 60, window: 60, cooldown: 60 },
 } as const;
