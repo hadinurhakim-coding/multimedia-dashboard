@@ -1,0 +1,14 @@
+private/
+.env*
+!.env.example
+.git/
+node_modules/
+.next/
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+*.pem
+*.key
+*.p12
+*.pfx

@@ -15,6 +15,8 @@ const cspHeader = `
 `.replace(/\s{2,}/g, ' ').trim();
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: { "/api/lpp/**": ["./assets/fonts/Roboto.ttf", "./assets/fonts/OFL.txt"] },
+  outputFileTracingExcludes: { "/*": ["./private/**/*", "./.env*", "./.git/**/*"] },
   /* config options here */
   experimental: {
     agentFeedback: true,

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { appFetch } from "@/lib/auth/fetch";
 import { DashboardSubheader } from "@/components/event/dashboard-subheader";
 import { StatCardsRow } from "@/components/event/stat-cards-row";
 import { TeamContributionHeatmap } from "@/components/event/team-contribution-heatmap";
@@ -84,7 +85,7 @@ export function EventView({
     let isMounted = true;
     async function fetchEventsFromNeon() {
       try {
-        const res = await fetch("/api/events");
+        const res = await appFetch("/api/events");
         if (!res.ok) return;
         const json = await res.json();
         if (json.success && Array.isArray(json.events) && json.events.length > 0) {

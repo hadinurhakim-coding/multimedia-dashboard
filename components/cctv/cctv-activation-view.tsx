@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import { appFetch } from "@/lib/auth/fetch";
 import {
   CCTVUnit,
   FacilityLocationId,
@@ -37,7 +38,7 @@ export function CCTVActivationView() {
     let isMounted = true;
     async function fetchFromNeon() {
       try {
-        const res = await fetch(`/api/cctv?facilityId=${selectedLocationId}`);
+        const res = await appFetch(`/api/cctv?facilityId=${selectedLocationId}`);
         if (!res.ok) return;
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {

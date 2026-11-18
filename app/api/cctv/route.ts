@@ -1,3 +1,5 @@
+import { requireAppUser } from "@/lib/auth/access";
+import { appFailure, privateHeaders } from "@/lib/security/http";
 import { connection, NextRequest, NextResponse } from "next/server";
 import { queryNeon } from "@/lib/neon";
 import { CCTVUnit } from "@/types/cctv";
@@ -39,6 +41,7 @@ interface CCTVRow {
 export async function GET(request: NextRequest) {
   await connection();
   try {
+    await requireAppUser(request, "cctv:read");
     const { searchParams } = new URL(request.url);
     const facilityId = searchParams.get("facilityId");
 
@@ -99,17 +102,6 @@ export async function GET(request: NextRequest) {
       source: "neon-postgresql",
       count: cctvUnits.length,
       data: cctvUnits,
-    });
-  } catch (err: unknown) {
-    const error = err as Error;
-    console.error("Error fetching CCTV data from Neon:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        source: "neon-postgresql",
-        error: error.message || "Failed to query Neon PostgreSQL",
-      },
-      { status: 500 }
-    );
-  }
+    }, { headers: privateHeaders });
+  } catch (error) { return appFailure(error); }
 }

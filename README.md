@@ -15,7 +15,8 @@ Production-grade enterprise multimedia, event management, and 3D spatial IoT sur
 1. **Enterprise Dashboard Shell (Light Theme)**
    - Mengikuti standar resmi Shadcn Studio Shell 7 (*pure white canvas* `#ffffff`, no dark-mode slop, tipografi tajam Roboto).
    - Sidebar navigasi presisi dengan rasio logo petir PLN 1:1 (`aspect-square`) yang tetap simetris saat diminimalkan.
-   - Menu: **Dashboard**, **Event**, dan **Aktivasi**.
+   - Submenu tertutup pada kunjungan pertama. Status sidebar, submenu, dan menu aktif disimpan di `localStorage` (`pln-sidebar-preferences-v1`) dan dipulihkan setelah refresh; hanya preferensi navigasi yang disimpan.
+   - Menu: **Home**, **LPP**, **Event**, dan **Aktivasi**.
 
 2. **Peta Lokasi Spatial 3D (Digital Twin Substation GI Gandul)**
    - Visualisasi fasilitas gardu induk dan lokasi kamera CCTV secara 3D presisi tinggi menggunakan Three.js WebGL.
@@ -35,6 +36,17 @@ Production-grade enterprise multimedia, event management, and 3D spatial IoT sur
    - Script inisialisasi skema dan dummy data otomatis di `docker/init-db.sql`.
    - Mudah dipindahkan dan diinstalasi di server staging/production.
 
+5. **LPP Privat**
+   - Editor isi template Excel, draf per pengguna, dan ekspor yang mempertahankan workbook asli.
+   - Akses melalui Neon Auth dan daftar email internal terverifikasi.
+   - Folder `private/` dikecualikan dari Git, Vercel, Docker, npm, dan tracing build Next.js.
+   - Konfigurasi dan batasan ekspor: [panduan LPP](docs/lpp.md).
+
+6. **Login Terpusat**
+   - Neon Auth di halaman utama; dashboard dan semua API memeriksa akun internal.
+   - Rate limiter bersama di PostgreSQL untuk login, API, unggahan, dan ekspor.
+   - Konfigurasi, kontrol akses, dan batasan hosting: [panduan autentikasi](docs/authentication.md).
+
 ---
 
 ## 🛠️ Tech Stack
@@ -51,7 +63,7 @@ Production-grade enterprise multimedia, event management, and 3D spatial IoT sur
 ## 🚀 Memulai (Local Development)
 
 ### 1. Prasyarat
-- Node.js 20+
+- Node.js 24 (sesuai CI dan script konfigurasi)
 - pnpm (`corepack enable pnpm` atau `npm i -g pnpm`)
 - Docker & Docker Compose (opsional, untuk database PostgreSQL lokal)
 

@@ -1,3 +1,5 @@
+import { requireAppUser } from "@/lib/auth/access";
+import { appFailure, privateHeaders } from "@/lib/security/http";
 import { connection, NextResponse } from "next/server";
 import { queryNeon } from "@/lib/neon";
 import { FacilityLocation } from "@/types/cctv";
@@ -12,9 +14,10 @@ interface FacilityRow {
   badge: string;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   await connection();
   try {
+    await requireAppUser(request, "facilities:read");
     const rows = await queryNeon<FacilityRow>(`
       SELECT id, name, subtitle, description, facility_type, dot_color, badge
       FROM facility_locations
@@ -36,17 +39,6 @@ export async function GET() {
       source: "neon-postgresql",
       count: facilities.length,
       data: facilities,
-    });
-  } catch (err: unknown) {
-    const error = err as Error;
-    console.error("Error fetching facilities from Neon:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        source: "neon-postgresql",
-        error: error.message || "Failed to query Neon PostgreSQL",
-      },
-      { status: 500 }
-    );
-  }
+    }, { headers: privateHeaders });
+  } catch (error) { return appFailure(error); }
 }

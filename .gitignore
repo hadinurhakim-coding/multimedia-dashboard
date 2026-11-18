@@ -3,6 +3,7 @@
 # ==============================================================================
 
 # 1. Environment Variables & Secret Credentials (HIGHEST PRIORITY)
+/private/
 .env
 .env.*
 .env*.local

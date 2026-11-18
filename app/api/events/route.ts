@@ -1,3 +1,5 @@
+import { requireAppUser } from "@/lib/auth/access";
+import { appFailure, privateHeaders } from "@/lib/security/http";
 import { connection, NextResponse } from "next/server";
 import { queryNeon } from "@/lib/neon";
 import { OvertimeEvent, Member } from "@/types/event";
@@ -33,9 +35,10 @@ interface MemberRow {
   created_at: string;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   await connection();
   try {
+    await requireAppUser(request, "events:read");
     const eventRows = await queryNeon<EventRow>(`
       SELECT 
         id, title, to_char(date, 'YYYY-MM-DD') as date,
@@ -104,17 +107,6 @@ export async function GET() {
       source: "neon-postgresql",
       events,
       members,
-    });
-  } catch (err: unknown) {
-    const error = err as Error;
-    console.error("Error fetching events from Neon:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        source: "neon-postgresql",
-        error: error.message || "Failed to query Neon PostgreSQL",
-      },
-      { status: 500 }
-    );
-  }
+    }, { headers: privateHeaders });
+  } catch (error) { return appFailure(error); }
 }

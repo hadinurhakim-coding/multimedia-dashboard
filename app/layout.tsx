@@ -19,9 +19,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${roboto.variable} ${roboto.className} h-full antialiased overflow-x-hidden`}
+      className={`${roboto.variable} ${roboto.className} h-full antialiased overflow-x-clip`}
     >
-      <body className="min-h-full flex flex-col bg-white text-zinc-900 font-sans overflow-x-hidden">
+      <body className="min-h-full flex flex-col bg-white text-zinc-900 font-sans overflow-x-clip">
         <TooltipProvider>{children}</TooltipProvider>
       </body>
     </html>

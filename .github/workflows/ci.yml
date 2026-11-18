@@ -31,6 +31,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -54,11 +56,26 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
 
-      - name: Run ESLint
-        run: pnpm lint
+      - name: Run ESLint (strict, zero warnings)
+        run: pnpm exec eslint . --max-warnings=0
+
+      - name: Check private data exclusion
+        run: pnpm privacy:check
+
+      - name: Check authentication boundaries
+        run: pnpm test:auth
+
+      - name: Check LPP export fidelity
+        run: pnpm test:lpp
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=moderate
 
       - name: Run TypeScript typecheck
         run: pnpm typecheck
 
       - name: Run Next.js production build
         run: pnpm build
+
+      - name: Check deployment output privacy
+        run: node scripts/check-private.mjs --build
