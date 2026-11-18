@@ -1,6 +1,6 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { FileSpreadsheet, Download, Save, FolderOpen, Plus } from "lucide-react";
+import { useCallback, useEffect, useId, useState } from "react";
+import { FileSpreadsheet, Download, Save, FolderOpen, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { appFetch } from "@/lib/auth/fetch";
@@ -29,6 +29,9 @@ export function LppView({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => 
   const [title, setTitle] = useState("");
   const [sheetIndex, setSheetIndex] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<"new" | "save" | "export" | "photo" | "other" | null>(null);
+  const [busyLabel, setBusyLabel] = useState("Memproses…");
+  const titleInputId = useId();
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
@@ -65,9 +68,9 @@ export function LppView({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => 
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
-  const run = async (fn: () => Promise<void>) => {
-    setBusy(true); setMessage("");
-    try { await fn(); } catch (error) { setMessage(error instanceof Error ? error.message : "Terjadi kesalahan."); } finally { setBusy(false); }
+  const run = async (fn: () => Promise<void>, label = "Memproses…", action: "new" | "save" | "export" | "other" = "other") => {
+    setBusy(true); setBusyAction(action); setBusyLabel(label); setMessage("");
+    try { await fn(); } catch (error) { setMessage(error instanceof Error ? error.message : "Terjadi kesalahan."); } finally { setBusy(false); setBusyAction(null); setBusyLabel("Memproses…"); }
   };
   async function open(templateId: string, existing?: LppDraft) {
     if (dirty && !window.confirm("Perubahan belum disimpan. Buka dokumen lain?")) return;
@@ -99,11 +102,11 @@ export function LppView({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => 
   }
   const sheet = document?.sheets[sheetIndex];
   async function uploadPhoto(itemId: string, file: File) {
-    setBusy(true); setMessage("");
+    setBusy(true); setBusyAction("photo"); setBusyLabel("Mengunggah foto…"); setMessage("");
     try {
       const result = await (await api("/api/lpp/photos", { method: "POST", headers: { "Content-Type": file.type }, body: file })).json() as { id: string };
       setPhotos((current) => ({ ...current, [itemId]: result.id })); setDirty(true);
-    } finally { setBusy(false); }
+    } finally { setBusy(false); setBusyAction(null); setBusyLabel("Memproses…"); }
   }
   function resetPhoto(itemId: string) {
     setPhotos((current) => { const next = { ...current }; delete next[itemId]; return next; }); setDirty(true);
@@ -154,35 +157,49 @@ export function LppView({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => 
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h1 className="text-2xl font-semibold text-pln-navy">{screen === "drafts" ? "Draf LPP" : "LPP"}</h1><p className="mt-1 text-sm text-zinc-500">{screen === "drafts" ? "Buka laporan tersimpan. Tanggal mengikuti header laporan yang disimpan." : "Kelola laporan dan ekspor Excel sesuai template."}</p></div>
     </div>
-    <p role="status" aria-live="polite" className="text-sm text-pln-navy">{busy ? "Memproses…" : message}</p>
-    {!catalog ? <div className="rounded-xl border bg-white p-6"><p className="text-sm text-zinc-500">{message ? "Daftar laporan belum dapat dimuat." : "Memuat laporan…"}</p>{message && <Button variant="outline" className="mt-3" disabled={busy} onClick={() => void run(refresh)}>Coba lagi</Button>}</div> : screen === "drafts" ? <DraftsPage drafts={catalog.drafts} templates={catalog.templates} busy={busy}
+    <p role="status" aria-live="polite" className="text-sm text-pln-navy">{busy ? busyLabel : message}</p>
+    {!catalog ? <div className="rounded-xl border bg-white p-6"><p className="text-sm text-zinc-500">{message ? "Daftar laporan belum dapat dimuat." : "Memuat laporan…"}</p>{message && <Button variant="outline" className="mt-3" disabled={busy} onClick={() => void run(refresh, "Memuat daftar…")}>Coba lagi</Button>}</div> : screen === "drafts" ? <DraftsPage drafts={catalog.drafts} templates={catalog.templates} busy={busy}
       onBack={() => { setScreen("editor"); setMessage(""); window.scrollTo({ top: 0 }); }}
-      onOpen={(item) => void run(async () => { const detail = await (await api(`/api/lpp/drafts/${item.id}`)).json() as LppDraft; await open(detail.templateId, detail); })}
-      onExport={(item) => void run(() => downloadDraft(item.id))}
+      onOpen={(item) => void run(async () => { const detail = await (await api(`/api/lpp/drafts/${item.id}`)).json() as LppDraft; await open(detail.templateId, detail); }, "Membuka draf…")}
+      onExport={(item) => void run(() => downloadDraft(item.id), "Mengekspor Excel…")}
       onDelete={(item) => {
         if (!window.confirm("Hapus draf ini?")) return;
         void run(async () => {
           await api(`/api/lpp/drafts/${item.id}`, { method: "DELETE" });
           if (draft?.id === item.id) { setDraft(null); if (!dirty) { setDocument(null); setTitle(""); setReportDate(""); } }
           await refresh(); setMessage("Draf dihapus.");
-        });
+        }, "Menghapus draf…");
       }}
     /> : <>
       <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-white p-4">
-        <label className="min-w-0 flex-1 space-y-1 text-sm"><span>Template laporan</span><select aria-label="Template laporan" className="h-10 w-full rounded-md border bg-white px-3" value={document?.id ?? ""} disabled={busy} onChange={(e) => { if (e.target.value) void run(() => open(e.target.value)); }}><option value="">Pilih template…</option>{catalog.templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.documentationTableAvailable ? " — Tabel dokumentasi" : t.formAvailable ? " — Form input" : ""}</option>)}</select></label>
-        <Button variant="outline" className="h-10" disabled={busy} onClick={() => void run(async () => { await refresh(); setScreen("drafts"); window.scrollTo({ top: 0 }); })}><FolderOpen className="size-4" />Draf</Button>
+        <label className="min-w-0 flex-1 space-y-1 text-sm"><span>Template laporan</span><select aria-label="Template laporan" className="h-10 w-full rounded-md border bg-white px-3" value={document?.id ?? ""} disabled={busy} onChange={(e) => { if (e.target.value) void run(() => open(e.target.value), "Memuat template…"); }}><option value="">Pilih template…</option>{catalog.templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.documentationTableAvailable ? " — Tabel dokumentasi" : t.formAvailable ? " — Form input" : ""}</option>)}</select></label>
+        <Button variant="outline" className="h-10" disabled={busy} onClick={() => void run(async () => { await refresh(); setScreen("drafts"); window.scrollTo({ top: 0 }); }, "Memuat draf…")}><FolderOpen className="size-4" />Draf</Button>
         {!catalog.templates.length && <p className="w-full text-sm">Template belum tersedia. Hubungi administrator.</p>}
       </div>
       {document && sheet && <div className="space-y-3">
-        <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-white p-3 shadow-sm">
-          <label className="min-w-60 flex-1 space-y-1 text-sm">Judul laporan<Input maxLength={150} disabled={busy} value={title} onChange={(e) => { setTitle(e.target.value); setDirty(true); }} /></label>
-          <Button variant="outline" disabled={busy} onClick={() => void run(() => open(document.id))}><Plus className="size-4" /> Draf baru</Button>
-          <Button variant="outline" disabled={busy || !title.trim()} onClick={() => void run(async () => { await save(); setMessage("Draf tersimpan."); })}><Save className="size-4" /> Simpan{dirty ? " *" : ""}</Button>
-          <Button className="bg-pln-navy text-white" disabled={busy || !title.trim()} onClick={() => void run(async () => {
-            setShowFormErrors(true);
-            if (document.form && Object.keys(formErrors(document.form, document, edits)).length) throw new Error("Lengkapi field wajib pada form sebelum mengekspor. Anda tetap dapat menyimpan draf.");
-            const saved = await save(); await downloadDraft(saved.id);
-          })}><Download className="size-4" /> Ekspor Excel</Button>
+        <div className="space-y-1.5 rounded-xl border bg-white p-3 shadow-sm">
+          <div className="flex min-h-5 items-center justify-between gap-2">
+            <label htmlFor={titleInputId} className="text-sm">Judul laporan</label>
+            {busy && (
+              <span
+                data-slot="lpp-action-loading"
+                className="inline-flex items-center gap-1.5 rounded-full bg-pln-ice px-2.5 py-0.5 text-xs font-medium text-pln-navy ring-1 ring-pln-cyan/30"
+              >
+                <Loader2 className="size-3.5 animate-spin text-pln-cyan" aria-hidden="true" />
+                <span>{busyLabel}</span>
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input id={titleInputId} maxLength={150} disabled={busy} className="min-w-60 flex-1" value={title} onChange={(e) => { setTitle(e.target.value); setDirty(true); }} />
+            <Button variant="outline" disabled={busy} onClick={() => void run(() => open(document.id), "Membuat draf baru…", "new")}>{busyAction === "new" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Plus className="size-4" />} Draf baru</Button>
+            <Button variant="outline" disabled={busy || !title.trim()} onClick={() => void run(async () => { await save(); setMessage("Draf tersimpan."); }, "Menyimpan draf…", "save")}>{busyAction === "save" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Save className="size-4" />} Simpan{dirty ? " *" : ""}</Button>
+            <Button className="bg-pln-navy text-white" disabled={busy || !title.trim()} onClick={() => void run(async () => {
+              setShowFormErrors(true);
+              if (document.form && Object.keys(formErrors(document.form, document, edits)).length) throw new Error("Lengkapi field wajib pada form sebelum mengekspor. Anda tetap dapat menyimpan draf.");
+              const saved = await save(); await downloadDraft(saved.id);
+            }, "Mengekspor Excel…", "export")}>{busyAction === "export" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Download className="size-4" />} Ekspor Excel</Button>
+          </div>
         </div>
         {document.form?.kind === "installation-v1" ? <InstallationForm key={`${document.id}:${draft?.id ?? "new"}`} form={document.form} workbook={document} edits={edits} busy={busy} showErrors={showFormErrors} onChange={updateMany} templateId={document.id} photos={photos} onUploadPhoto={uploadPhoto} onResetPhoto={resetPhoto} /> : <>
         {document.form?.kind === "documentation-table-v1" && <>
