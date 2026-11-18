@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { DraftViewMenu } from "@/components/lpp/draft-view-menu";
+import { DraftDateRangePicker } from "@/components/lpp/draft-date-range-picker";
 import { FolderCollectionView, FolderFilesView } from "@/components/lpp/draft-browser-views";
 import { summarizeSelection, toggleSelectionSet } from "@/lib/lpp/bulk-export";
 import {
@@ -385,52 +386,31 @@ export function DraftsPage({
           )
         ) : (
           <div>
-            {activeFolder.months.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 border-b px-5 py-3">
-                <span className="text-xs font-medium text-zinc-500">Bulan:</span>
-                <button
-                  type="button"
-                  onClick={() => setMonthFilter("all")}
-                  aria-pressed={monthFilter === "all"}
-                  className={cn(
-                    "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                    monthFilter === "all"
-                      ? "bg-pln-navy text-white"
-                      : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200/80"
-                  )}
-                >
-                  Semua ({activeFolder.drafts.length})
-                </button>
-                {activeFolder.months.map((month) => {
-                  const count = activeFolder.drafts.filter(
-                    (item) => resolveReportDate(item).slice(0, 7) === month.key
-                  ).length;
-                  const active = monthFilter === month.key;
-                  return (
-                    <button
-                      key={month.key}
-                      type="button"
-                      onClick={() => setMonthFilter(month.key)}
-                      aria-pressed={active}
-                      className={cn(
-                        "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                        active
-                          ? "bg-pln-navy text-white"
-                          : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200/80"
-                      )}
-                    >
-                      {month.label} ({count})
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <DraftDateRangePicker
+              value={monthFilter}
+              draftDates={activeFolder.drafts.map((item) => resolveReportDate(item))}
+              filteredCount={visibleFolderDrafts.length}
+              totalCount={activeFolder.drafts.length}
+              disabled={busy}
+              onChange={setMonthFilter}
+            />
 
             {!visibleFolderDrafts.length ? (
               <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
                 <FileSpreadsheet className="size-7 text-zinc-400" />
                 <p className="font-medium text-pln-charcoal">Tidak ada file yang cocok</p>
-                <p className="text-sm text-zinc-500">Ubah filter bulan atau kata kunci pencarian.</p>
+                <p className="text-sm text-zinc-500">Ubah rentang tanggal atau kata kunci pencarian.</p>
+                {(monthFilter !== "all" || Boolean(searchQuery.trim())) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => { setMonthFilter("all"); setSearchQuery(""); }}
+                  >
+                    Tampilkan semua file
+                  </Button>
+                )}
               </div>
             ) : (
               <div>

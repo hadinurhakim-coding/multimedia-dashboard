@@ -118,6 +118,14 @@ test("Drafts inside a folder filter accurately by month and search query", () =>
     filterFolderDrafts(folder.drafts, folder.name, { query: "2026-11-18" }).map((d) => d.id),
     ["d1"]
   );
+  assert.deepEqual(
+    filterFolderDrafts(folder.drafts, folder.name, { monthKey: "2026-10-01..2026-10-31" }).map((d) => d.id),
+    ["d2"]
+  );
+  assert.deepEqual(
+    filterFolderDrafts(folder.drafts, folder.name, { monthKey: "2026-10-01..2026-11-30" }).map((d) => d.id),
+    ["d1", "d2"]
+  );
   assert.equal(folder.totalChanges, 4);
   assert.equal(folder.totalPhotos, 2);
 });

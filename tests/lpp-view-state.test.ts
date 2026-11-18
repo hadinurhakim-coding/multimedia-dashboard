@@ -34,6 +34,17 @@ test("LPP navigation state parser restores valid screens, folders, months, and d
     draftId: null,
   });
 
+  const insideFolderRange = parseLppNavigationState(
+    JSON.stringify({ screen: "drafts", folderId, monthFilter: "2026-03-01..2026-10-01", templateId: null, draftId: null })
+  );
+  assert.deepEqual(insideFolderRange, {
+    screen: "drafts",
+    folderId,
+    monthFilter: "2026-03-01..2026-10-01",
+    templateId: null,
+    draftId: null,
+  });
+
   const openDraft = parseLppNavigationState(
     JSON.stringify({ screen: "editor", folderId: "../bad", monthFilter: "bad", templateId: folderId, draftId })
   );

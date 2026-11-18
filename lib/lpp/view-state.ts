@@ -1,3 +1,5 @@
+import { normalizeDraftDateFilterValue } from "./date-range";
+
 export type LppScreen = "editor" | "drafts";
 
 export type LppNavigationState = {
@@ -33,10 +35,7 @@ export function parseLppNavigationState(raw: string | null): LppNavigationState 
     }
     const screen: LppScreen = parsed.screen === "drafts" ? "drafts" : "editor";
     const folderId = isOpaqueId(parsed.folderId) ? parsed.folderId : null;
-    const monthFilter =
-      folderId && typeof parsed.monthFilter === "string" && /^\d{4}-\d{2}$/.test(parsed.monthFilter)
-        ? parsed.monthFilter
-        : "all";
+    const monthFilter = folderId ? normalizeDraftDateFilterValue(parsed.monthFilter) : "all";
     const templateId = isOpaqueId(parsed.templateId) ? parsed.templateId : null;
     const draftId = isOpaqueId(parsed.draftId, true) ? parsed.draftId : null;
     return { screen, folderId, monthFilter, templateId, draftId };

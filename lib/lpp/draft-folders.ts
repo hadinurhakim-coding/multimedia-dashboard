@@ -1,3 +1,4 @@
+import { matchesDraftDateFilter, parseDraftDateFilter } from "./date-range";
 import { templateDisplayName, lppExportFilename } from "./naming";
 import { resolveReportDate } from "./report-date";
 import type { LppDraft, LppTemplate } from "@/types/lpp";
@@ -168,19 +169,19 @@ export function buildDraftFolders(
   });
 }
 
-/** Filters drafts within a folder by month key ("all" or YYYY-MM) and optional search query. */
+/** Filters drafts within a folder by month/date-range filter ("all", YYYY-MM, YYYY-MM-DD, or YYYY-MM-DD..YYYY-MM-DD) and optional search query. */
 export function filterFolderDrafts(
   drafts: DraftSummary[],
   templateName: string | undefined,
   options: { monthKey?: string; query?: string } = {}
 ): DraftSummary[] {
-  const monthKey = options.monthKey && options.monthKey !== "all" ? options.monthKey : null;
+  const dateFilter = parseDraftDateFilter(options.monthKey);
   const query = (options.query ?? "").trim().toLowerCase();
 
   return drafts.filter((draft) => {
     const date = resolveReportDate(draft);
     const month = reportMonthOf(date);
-    if (monthKey && month.key !== monthKey) return false;
+    if (!matchesDraftDateFilter(date, dateFilter)) return false;
     if (!query) return true;
 
     const haystack = [
