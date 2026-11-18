@@ -15,7 +15,7 @@ export type LppForm = {
     dateTargets: FormTarget[];
   };
 };
-export type LppPhotoSlot = { id: string; itemId: string; sheet: string; row: number; column: number; anchorId?: string };
+export type LppPhotoSlot = { id: string; itemId: string; sheet: string; row: number; column: number; anchorId?: string; hasTemplatePhoto?: boolean };
 export function formPhotoSlots(form: LppForm): LppPhotoSlot[] {
   return form.photoSlots ?? form.items.map((item) => {
     const target = item.fields[3].targets[0];

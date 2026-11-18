@@ -101,6 +101,17 @@ picture slots sharing a cell, isolated by drawing ID. The header date updates
 both A10 cells and the sign-off date in D39. Rows with blank installation
 location remain exportable, and non-picture shape annotations remain untouched.
 
+`LPP_COMMAND_CENTER_TEMPLATE_ID` (141 report rows, sign-off cell `C126`),
+`LPP_TASK_FORCE_TEMPLATE_ID` (271 report rows, sign-off cell `C256`), and
+`LPP_HC_OPERATION_TEMPLATE_ID` (104 report rows, sign-off cell `C89`) select the
+three 15-row standalone-documentation layouts (28 documentation rows each). Their
+Sheet 2 placeholder rows (`B14:C28`) start blank and optional; header/report
+dates synchronize both A10 cells and preserve the sign-off city prefix
+(`Jakarta, <date>`). Documentation photo slots start empty without requesting
+missing template thumbnails, and uploaded photos insert cell-fitted JPEG frames
+(`twoCellAnchor`) with burned-in watermarks while leaving existing non-picture
+shape annotations and print settings intact.
+
 Only copies placed directly in the private `data-lpp/` directory appear in the
 catalog; the nested template archive stays hidden. Provision the chosen original
 there without changing its bytes, then set its filename SHA-256 in the server

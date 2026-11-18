@@ -23,7 +23,39 @@ export async function normalizePhoto(buffer: Buffer, contentType: string) {
   } catch { throw new Error("Foto tidak dapat dibaca. Gunakan gambar statis JPG, PNG, atau WebP hingga 40 megapiksel."); }
 }
 
-type PhotoSlot = { itemId: string; anchor: string; drawing: string; rels: string; media: string; width: number; height: number };
+type PhotoSlot = {
+  itemId: string; drawing: string; rels: string; row: number; column: number;
+  width: number; height: number; anchor?: string; media?: string; insetX?: number; insetY?: number;
+};
+const EMU_PER_POINT = 12700;
+const EMU_PER_PIXEL = 9525;
+const CELL_INSET_EMU = 45720;
+
+function blankFrameDimensions(sheetNode: Node, row: number, column: number) {
+  const colNumber = column + 1, rowNumber = row + 1;
+  const colNode = list(node(sheetNode.cols).col).find((c) => Number(c["@min"]) <= colNumber && colNumber <= Number(c["@max"]));
+  const colWidthChars = Number(colNode?.["@width"] ?? 0);
+  const rowNode = list(node(sheetNode.sheetData).row).find((r) => Number(r["@r"]) === rowNumber);
+  const defaultRowHeight = Number(node(sheetNode.sheetFormatPr)["@defaultRowHeight"] ?? 0);
+  const rowHeightPt = Number(rowNode?.["@ht"] ?? defaultRowHeight);
+  const cellWidthEmu = colWidthChars > 0
+    ? Math.round((((256 * colWidthChars + Math.floor(128 / 7)) / 256) * 7) * EMU_PER_PIXEL)
+    : 2_400_000 + CELL_INSET_EMU * 2;
+  const cellHeightEmu = rowHeightPt > 0 ? Math.round(rowHeightPt * EMU_PER_POINT) : 1_800_000 + CELL_INSET_EMU * 2;
+  return {
+    width: Math.max(200_000, cellWidthEmu - CELL_INSET_EMU * 2),
+    height: Math.max(200_000, cellHeightEmu - CELL_INSET_EMU * 2),
+    insetX: CELL_INSET_EMU,
+    insetY: CELL_INSET_EMU,
+  };
+}
+
+function buildPictureAnchor(slot: PhotoSlot, relationshipId: string, shapeId: number) {
+  const insetX = slot.insetX ?? CELL_INSET_EMU;
+  const insetY = slot.insetY ?? CELL_INSET_EMU;
+  return `<xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>${slot.column}</xdr:col><xdr:colOff>${insetX}</xdr:colOff><xdr:row>${slot.row}</xdr:row><xdr:rowOff>${insetY}</xdr:rowOff></xdr:from><xdr:to><xdr:col>${slot.column}</xdr:col><xdr:colOff>${insetX + slot.width}</xdr:colOff><xdr:row>${slot.row}</xdr:row><xdr:rowOff>${insetY + slot.height}</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${shapeId}" name="Picture ${shapeId}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1" noChangeArrowheads="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="${relationshipId}"/><a:srcRect/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${slot.width}" cy="${slot.height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>`;
+}
+
 async function xml(zip: JSZip, path: string) {
   const file = zip.file(path);
   if (!file) throw new Error("Struktur foto template tidak valid.");
@@ -60,15 +92,18 @@ async function photoSlots(zip: JSZip, form: LppForm): Promise<PhotoSlot[]> {
       if (slot.anchorId && String(node(node(pic.nvPicPr).cNvPr)["@id"]) !== slot.anchorId) return [];
       const width = Number(extent["@cx"]), height = Number(extent["@cy"]);
       if (!(width > 0 && height > 0)) throw new Error("Ukuran bingkai foto tidak valid.");
-      return [{ itemId: slot.id, anchor, drawing, rels, width, height, media: resolveTarget(drawing, imageRels.find((r) => r["@Id"] === blip["@embed"]), "xl/media/") }];
+      return [{ itemId: slot.id, anchor, drawing, rels, row: slot.row, column: slot.column, width, height, media: resolveTarget(drawing, imageRels.find((r) => r["@Id"] === blip["@embed"]), "xl/media/") }];
     });
+    if (matches.length === 0 && slot.hasTemplatePhoto === false) {
+      return { itemId: slot.id, drawing, rels, row: slot.row, column: slot.column, ...blankFrameDimensions(worksheet, slot.row, slot.column) };
+    }
     if (matches.length !== 1) throw new Error("Posisi foto perangkat tidak dapat dipastikan.");
     return matches[0];
   });
 }
 export async function templatePhoto(buffer: Buffer, form: LppForm, itemId: string, thumbnail = false) {
   const zip = await JSZip.loadAsync(buffer), slot = (await photoSlots(zip, form)).find((s) => s.itemId === itemId);
-  if (!slot) throw new Error("Foto perangkat tidak ditemukan.");
+  if (!slot || !slot.media) throw new Error("Foto template tidak ditemukan.");
   const source = zip.file(slot.media);
   if (!source) throw new Error("Foto template tidak ditemukan.");
   // Safe preview, with the same orientation/metadata policy as uploaded photos.
@@ -98,10 +133,10 @@ export async function templateHeaderLogo(buffer: Buffer) {
   return sharp(await source.async("nodebuffer"), imageOptions).resize({ width: 440, height: 140, fit: "inside", withoutEnlargement: true }).png().toBuffer();
 }
 async function renderSlot(zip: JSZip, slot: PhotoSlot, uploaded?: Buffer, watermark?: string, format: "png" | "jpeg" = "png") {
-  const original = uploaded ? undefined : zip.file(slot.media);
+  const original = uploaded || !slot.media ? undefined : zip.file(slot.media);
   if (!uploaded && !original) throw new Error("Foto template tidak ditemukan.");
   let source = uploaded ?? await original!.async("nodebuffer");
-  if (!uploaded) {
+  if (!uploaded && slot.anchor) {
     // Preserve the original Excel crop before flattening it into the replacement image.
     const anchor = node(parser.parse(slot.anchor)), data = node(anchor.twoCellAnchor ?? anchor.oneCellAnchor);
     const crop = node(node(node(data.pic).blipFill).srcRect);
@@ -127,6 +162,7 @@ async function renderSlot(zip: JSZip, slot: PhotoSlot, uploaded?: Buffer, waterm
 export async function watermarkedPhotoPreview(buffer: Buffer, form: LppForm, itemId: string, watermark: string, uploaded?: Buffer) {
   const zip = await JSZip.loadAsync(buffer), slot = (await photoSlots(zip, form)).find((slot) => slot.itemId === itemId);
   if (!slot) throw new Error("Foto perangkat tidak ditemukan.");
+  if (!uploaded && !slot.media) throw new Error("Foto perangkat belum diunggah.");
   return renderSlot(zip, slot, uploaded, watermark, form.photoFormat);
 }
 
@@ -138,10 +174,12 @@ export async function exportPhotos(buffer: Buffer, form: LppForm, photos: { item
     if (!slots.some((slot) => slot.itemId === photo.itemId) || seen.has(photo.itemId)) throw new Error("Posisi foto tidak valid.");
     seen.add(photo.itemId);
   }
-  const replacements = watermark ? slots : photos.map((photo) => slots.find((slot) => slot.itemId === photo.itemId)!);
+  const uploadedByItem = new Map(photos.map((photo) => [photo.itemId, photo.buffer]));
+  const replacements = slots.filter((slot) => uploadedByItem.has(slot.itemId) || (Boolean(watermark) && Boolean(slot.media)));
+  if (!replacements.length) return buffer;
   const extension = form.photoFormat === "jpeg" ? "jpg" : "png";
   for (const slot of replacements) {
-    const replacement = await renderSlot(zip, slot, photos.find((photo) => photo.itemId === slot.itemId)?.buffer, watermark, form.photoFormat);
+    const replacement = await renderSlot(zip, slot, uploadedByItem.get(slot.itemId), watermark, form.photoFormat);
     let index = 1;
     while (zip.file(`xl/media/lpp-photo-${index}.${extension}`)) index++;
     const media = `xl/media/lpp-photo-${index}.${extension}`;
@@ -150,8 +188,16 @@ export async function exportPhotos(buffer: Buffer, form: LppForm, photos: { item
     while (relationships.includes(`Id="${relationshipId}"`)) relationshipId += "x";
     zip.file(media, replacement, { createFolders: false });
     zip.file(slot.rels, relationships.replace("</Relationships>", `<Relationship Id="${relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/lpp-photo-${index}.${extension}"/></Relationships>`), { createFolders: false });
-    const anchor = slot.anchor.replace(/r:embed="[^"]*"/, `r:embed="${relationshipId}"`).replace(/<a:srcRect\b[^>]*?(?:\/>|>[\s\S]*?<\/a:srcRect>)/, "<a:srcRect/>");
-    zip.file(slot.drawing, (await xml(zip, slot.drawing)).replace(slot.anchor, () => anchor), { createFolders: false });
+    const drawingXml = await xml(zip, slot.drawing);
+    if (slot.anchor) {
+      const anchor = slot.anchor.replace(/r:embed="[^"]*"/, `r:embed="${relationshipId}"`).replace(/<a:srcRect\b[^>]*?(?:\/>|>[\s\S]*?<\/a:srcRect>)/, "<a:srcRect/>");
+      zip.file(slot.drawing, drawingXml.replace(slot.anchor, () => anchor), { createFolders: false });
+    } else {
+      if (!drawingXml.includes("</xdr:wsDr>")) throw new Error("Struktur gambar template tidak valid.");
+      const usedIds = [...drawingXml.matchAll(/<xdr:cNvPr\b[^>]*\bid="(\d+)"/g)].map((match) => Number(match[1]));
+      const nextShapeId = Math.max(0, ...usedIds) + 1;
+      zip.file(slot.drawing, drawingXml.replace("</xdr:wsDr>", `${buildPictureAnchor(slot, relationshipId, nextShapeId)}</xdr:wsDr>`), { createFolders: false });
+    }
   }
   const types = await xml(zip, "[Content_Types].xml");
   if (!new RegExp(`<Default\\b[^>]*Extension="${extension}"`).test(types)) zip.file("[Content_Types].xml", types.replace("</Types>", `<Default Extension="${extension}" ContentType="image/${form.photoFormat ?? "png"}"/></Types>`), { createFolders: false });

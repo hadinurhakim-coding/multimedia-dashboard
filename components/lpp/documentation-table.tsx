@@ -36,6 +36,10 @@ export function DocumentationTable({ form, workbook, edits, templateId, template
   const location = (item: LppForm["items"][number]) => readFormField(item.fields[1], workbook, edits);
   let watermark = "";
   try { if (form.reportHeader) watermark = lppPhotoWatermark(templateName, reportDate); } catch { /* The date field may be temporarily empty while editing. */ }
+  const hasSlotPhoto = (slotId: string) => {
+    const slot = slots.find((entry) => entry.id === slotId);
+    return Boolean(photos[slotId]) || slot?.hasTemplatePhoto !== false;
+  };
   const source = (slotId: string, thumbnail = false) => {
     if (watermark && !thumbnail) {
       const params = new URLSearchParams({ watermark: "1", reportDate, ...(photos[slotId] ? { photo: photos[slotId] } : {}) });
@@ -81,16 +85,18 @@ export function DocumentationTable({ form, workbook, edits, templateId, template
       </TableRow></TableHeader>
       <TableBody>{visible.map((item) => {
         const images = itemSlots(item.id), changed = images.filter((slot) => photos[slot.id]).length;
+        const allBlank = images.every((slot) => slot.hasTemplatePhoto === false);
+        const statusLabel = changed ? `${changed}/${images.length} diperbarui` : allBlank ? "Belum ada foto" : "Foto template";
         return <TableRow key={item.id} data-state={selected.includes(item.id) ? "selected" : undefined}>
           <TableCell className="pl-3"><Checkbox aria-label={`Pilih material ${item.number}`} checked={selected.includes(item.id)} disabled={busy} onCheckedChange={(checked) => setSelected((current) => checked ? [...new Set([...current, item.id])] : current.filter((id) => id !== item.id))} /></TableCell>
           <TableCell><div className="flex min-w-60 items-center gap-3">
             <button type="button" className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-pln-cyan" aria-label={`Lihat foto material ${item.number}`} onClick={() => open(item.id, false)} disabled={busy}>
-              <Avatar className="size-10 overflow-hidden rounded-sm after:rounded-[inherit]"><AvatarImage src={source(images[0].id, true)} alt={`Thumbnail material ${item.number}`} className="rounded-none! object-contain" /><AvatarFallback className="rounded-sm"><ImageIcon className="size-4" /></AvatarFallback></Avatar>
+              <Avatar className="size-10 overflow-hidden rounded-sm after:rounded-[inherit]">{hasSlotPhoto(images[0].id) && <AvatarImage src={source(images[0].id, true)} alt={`Thumbnail material ${item.number}`} className="rounded-none! object-contain" />}<AvatarFallback className="rounded-sm"><ImageIcon className="size-4" /></AvatarFallback></Avatar>
             </button>
             <div><p className="max-w-80 whitespace-normal font-medium">{itemName(item) || "Material belum diisi"}</p><span className="mt-0.5 block text-xs text-zinc-500">Dokumentasi {String(item.number).padStart(2, "0")} · {images.length} foto</span></div>
           </div></TableCell>
           <TableCell className="max-w-56 whitespace-normal text-zinc-600">{location(item) || "—"}</TableCell>
-          <TableCell><span className={`inline-flex items-center gap-1.5 text-xs ${changed ? "text-emerald-700" : "text-zinc-500"}`}><span className={`size-1.5 rounded-full ${changed ? "bg-emerald-500" : "bg-zinc-300"}`} />{changed ? `${changed}/${images.length} diperbarui` : "Foto template"}</span></TableCell>
+          <TableCell><span className={`inline-flex items-center gap-1.5 text-xs ${changed ? "text-emerald-700" : "text-zinc-500"}`}><span className={`size-1.5 rounded-full ${changed ? "bg-emerald-500" : "bg-zinc-300"}`} />{statusLabel}</span></TableCell>
           <TableCell className="pr-3"><div className="flex items-center justify-end gap-1">
             <Button variant="ghost" size="icon" className="rounded-full" title="Ubah foto" aria-label={`Ubah foto material ${item.number}`} disabled={busy} onClick={() => open(item.id, true)}><Pencil /></Button>
             <Button variant="ghost" size="icon" className="rounded-full" title="Pratinjau foto" aria-label={`Pratinjau material ${item.number}`} disabled={busy} onClick={() => open(item.id, false)}><Eye /></Button>
@@ -104,16 +110,16 @@ export function DocumentationTable({ form, workbook, edits, templateId, template
     </>}</div>
     <Dialog open={Boolean(activeItem)} onOpenChange={(open) => { if (!open && !busy) setActive(null); }}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-        <DialogHeader><DialogTitle>{editing ? "Ubah foto dokumentasi" : "Pratinjau dokumentasi"}</DialogTitle><DialogDescription>{activeItem ? `${itemName(activeItem)} · ${location(activeItem)}` : ""}</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{editing ? "Ubah foto dokumentasi" : "Pratinjau dokumentasi"}</DialogTitle><DialogDescription>{activeItem ? `${itemName(activeItem) || "Material belum diisi"} · ${location(activeItem) || "Lokasi belum diisi"}` : ""}</DialogDescription></DialogHeader>
         {watermark && <p className="text-xs text-zinc-500">Watermark mengikuti tanggal header laporan dan tercetak pada setiap foto di Excel.</p>}
         {activeItem && <div className={`grid gap-5 ${itemSlots(activeItem.id).length > 1 ? "sm:grid-cols-2" : ""}`}>
           {itemSlots(activeItem.id).map((slot, index) => <div key={slot.id} className="min-w-0 space-y-3">
-            <div className="flex justify-between text-sm"><span className="font-medium">Foto {index + 1}</span><span className="text-xs text-zinc-500">{photos[slot.id] ? "Foto unggahan" : "Foto template"}</span></div>
-            <PhotoPreview key={source(slot.id)} src={source(slot.id)} alt={`Foto ${index + 1} material ${activeItem.number}`} />
+            <div className="flex justify-between text-sm"><span className="font-medium">Foto {index + 1}</span><span className="text-xs text-zinc-500">{photos[slot.id] ? "Foto unggahan" : slot.hasTemplatePhoto === false ? "Belum ada foto" : "Foto template"}</span></div>
+            {hasSlotPhoto(slot.id) ? <PhotoPreview key={source(slot.id)} src={source(slot.id)} alt={`Foto ${index + 1} material ${activeItem.number}`} /> : <div className="flex aspect-[4/3] flex-col items-center justify-center rounded-lg border border-dashed bg-zinc-50 px-4 text-center text-sm text-zinc-500"><ImageIcon className="mb-2 size-6 text-zinc-400" />Belum ada foto untuk baris ini.</div>}
             {editing && <>
               <label htmlFor={`upload-${slot.id}`} className="flex items-center gap-2 text-sm font-medium"><Upload className="size-4" />Unggah foto {index + 1}</label>
               <Input id={`upload-${slot.id}`} aria-label={`Unggah foto ${index + 1} material ${activeItem.number}`} type="file" accept="image/jpeg,image/png,image/webp" className="h-auto py-2" disabled={busy} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; void upload(slot.id, file); }} />
-              {photos[slot.id] && <Button variant="outline" disabled={busy} onClick={() => reset([slot.id])}><RotateCcw className="size-4" />Gunakan foto template {index + 1}</Button>}
+              {photos[slot.id] && <Button variant="outline" disabled={busy} onClick={() => reset([slot.id])}><RotateCcw className="size-4" />{slot.hasTemplatePhoto === false ? `Hapus foto ${index + 1}` : `Gunakan foto template ${index + 1}`}</Button>}
             </>}
           </div>)}
         </div>}
