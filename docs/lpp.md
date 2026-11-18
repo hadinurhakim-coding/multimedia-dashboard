@@ -88,6 +88,13 @@ full-frame uploads, JPEG watermarks and dated Excel exports as the Auditorium
 layouts. Original rows, merges, image positions, logos and print settings remain
 unchanged; template values are read only after authorization.
 
+`LPP_PBH_TEMPLATE_ID` selects the 11-material videowall layout: 38 report rows,
+24 documentation rows, and 11 materials with 13 photos. Materials 5 and 11 each
+have two picture slots sharing a cell; their drawing IDs isolate each frame so
+an upload replaces only the selected photo. The header date updates both A10
+cells and the sign-off date in C27. Non-picture shape annotations (`oneCellAnchor`
+without images) and print settings are preserved untouched.
+
 Only copies placed directly in the private `data-lpp/` directory appear in the
 catalog; the nested template archive stays hidden. Provision the chosen original
 there without changing its bytes, then set its filename SHA-256 in the server

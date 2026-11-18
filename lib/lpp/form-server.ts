@@ -3,6 +3,7 @@ import { buildInstallationForm } from "./form";
 import { buildDocumentationForm } from "./documentation-form";
 import { buildAuditoriumDocumentationForm } from "./auditorium-form";
 import { buildCollaborationDocumentationForm } from "./collaboration-form";
+import { buildPbhDocumentationForm } from "./pbh-form";
 import type { LppWorkbook } from "@/types/lpp";
 
 export function hasLppForm(templateId: string) {
@@ -12,9 +13,11 @@ export function hasDocumentationTable(templateId: string) {
   return Boolean(process.env.LPP_DOCUMENTATION_TEMPLATE_ID) && templateId === process.env.LPP_DOCUMENTATION_TEMPLATE_ID
     || Boolean(process.env.LPP_AUDITORIUM_TEMPLATE_ID) && templateId === process.env.LPP_AUDITORIUM_TEMPLATE_ID
     || Boolean(process.env.LPP_AUDITORIUM_PHASE1_TEMPLATE_ID) && templateId === process.env.LPP_AUDITORIUM_PHASE1_TEMPLATE_ID
-    || Boolean(process.env.LPP_COLLABORATION_TEMPLATE_ID) && templateId === process.env.LPP_COLLABORATION_TEMPLATE_ID;
+    || Boolean(process.env.LPP_COLLABORATION_TEMPLATE_ID) && templateId === process.env.LPP_COLLABORATION_TEMPLATE_ID
+    || Boolean(process.env.LPP_PBH_TEMPLATE_ID) && templateId === process.env.LPP_PBH_TEMPLATE_ID;
 }
 export function getLppForm(templateId: string, workbook: LppWorkbook) {
+  if (process.env.LPP_PBH_TEMPLATE_ID && templateId === process.env.LPP_PBH_TEMPLATE_ID) return buildPbhDocumentationForm(workbook);
   if (process.env.LPP_COLLABORATION_TEMPLATE_ID && templateId === process.env.LPP_COLLABORATION_TEMPLATE_ID) return buildCollaborationDocumentationForm(workbook);
   if (process.env.LPP_AUDITORIUM_PHASE1_TEMPLATE_ID && templateId === process.env.LPP_AUDITORIUM_PHASE1_TEMPLATE_ID) return buildAuditoriumDocumentationForm(workbook, 1);
   if (process.env.LPP_AUDITORIUM_TEMPLATE_ID && templateId === process.env.LPP_AUDITORIUM_TEMPLATE_ID) return buildAuditoriumDocumentationForm(workbook);

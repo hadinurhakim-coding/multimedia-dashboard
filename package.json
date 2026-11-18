@@ -9,7 +9,7 @@
     "test:auth": "tsx --test tests/auth-security.test.ts",
     "security:setup": "node scripts/setup-security.mjs",
     "prebuild": "pnpm privacy:check",
-    "test:lpp": "tsx --test tests/lpp-workbook.test.ts tests/lpp-policy.test.ts tests/lpp-form.test.ts tests/lpp-photos.test.ts tests/lpp-documentation.test.ts tests/lpp-report-date.test.ts tests/lpp-auditorium.test.ts tests/lpp-auditorium-phase1.test.ts tests/lpp-collaboration.test.ts tests/lpp-draft-folders.test.ts",
+    "test:lpp": "tsx --test tests/lpp-workbook.test.ts tests/lpp-policy.test.ts tests/lpp-form.test.ts tests/lpp-photos.test.ts tests/lpp-documentation.test.ts tests/lpp-report-date.test.ts tests/lpp-auditorium.test.ts tests/lpp-auditorium-phase1.test.ts tests/lpp-collaboration.test.ts tests/lpp-pbh.test.ts tests/lpp-draft-folders.test.ts",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
