@@ -101,8 +101,7 @@ export function FolderCollectionView({
               <TableHead>Jumlah file</TableHead>
               <TableHead>Perubahan total</TableHead>
               <TableHead>Laporan terbaru</TableHead>
-              <TableHead>Terakhir disimpan</TableHead>
-              <TableHead className="pr-5">Bulan</TableHead>
+              <TableHead className="pr-5">Terakhir disimpan</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -152,11 +151,8 @@ export function FolderCollectionView({
                   <TableCell className="text-sm text-pln-charcoal">
                     {formatReportDate(folder.latestReportDate)}
                   </TableCell>
-                  <TableCell className="text-xs text-zinc-500">
+                  <TableCell className="pr-5 text-xs text-zinc-500">
                     {formatDraftUpdatedAt(folder.latestUpdatedAt)}
-                  </TableCell>
-                  <TableCell className="pr-5">
-                    <MonthBadges folder={folder} limit={2} />
                   </TableCell>
                 </TableRow>
               );
